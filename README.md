@@ -1,7 +1,7 @@
 ---
 title: RAG MLOps
 emoji: 📚
-colorFrom: teal
+colorFrom: blue
 colorTo: yellow
 sdk: docker
 app_port: 7860
