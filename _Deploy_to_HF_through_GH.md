@@ -16,23 +16,23 @@ Every push to `main` automatically:
 
 ## One-time setup (already done)
 
-| What | Value |
+| What | Where |
 |------|-------|
-| GitHub repo | https://github.com/irajkooh/Rag_mlop |
-| HF Space | https://huggingface.co/spaces/irajkoohi/Rag_mlop |
+| GitHub repo | [github.com/irajkooh/Rag_mlop](https://github.com/irajkooh/Rag_mlop) |
+| HF Space | [huggingface.co/spaces/irajkoohi/Rag_mlop](https://huggingface.co/spaces/irajkoohi/Rag_mlop) |
 | Workflow file | `.github/workflows/deploy.yml` |
 | GitHub secret | `HF_TOKEN` = your HF user access token |
 
 ### GitHub secret required
-Go to **github.com/irajkooh/Rag_mlop/settings/secrets/actions** and ensure:
+Go to **[GitHub → Secrets → Actions](https://github.com/irajkooh/Rag_mlop/settings/secrets/actions)** and ensure:
 - Name: `HF_TOKEN`
 - Value: your HuggingFace token (starts with `hf_`)
 
-Get/renew your token at **huggingface.co/settings/tokens** — needs **write** access.
+Get/renew your token at **[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)** — needs **write** access.
 
 ### GitHub PAT required (for pushing workflow files)
 Your GitHub Personal Access Token needs the **`workflow`** scope.
-Go to **github.com/settings/tokens** → Edit → check ☑️ `workflow` → Update token.
+Go to **[github.com/settings/tokens](https://github.com/settings/tokens)** → Edit → check ☑️ `workflow` → Update token.
 
 ---
 
@@ -45,12 +45,12 @@ git commit -m "your message"
 git push
 
 # 2. Watch the pipeline:
-#    https://github.com/irajkooh/Rag_mlop/actions
+#    github.com/irajkooh/Rag_mlop/actions
 #    Green ✅ = deployed to HF Spaces
 #    Red ❌ = check the failed step
 
 # 3. Once green, HF builds Docker (~3-5 min first time, ~1 min after):
-#    https://huggingface.co/spaces/irajkoohi/Rag_mlop
+#    huggingface.co/spaces/irajkoohi/Rag_mlop
 ```
 
 ---
@@ -70,7 +70,7 @@ git push
 
 ## HF Space environment variables (Secrets)
 
-Set these in **huggingface.co/spaces/irajkoohi/Rag_mlop/settings**:
+Set these in **[HF Space Settings](https://huggingface.co/spaces/irajkoohi/Rag_mlop/settings)**:
 
 | Variable | Description |
 |----------|-------------|
@@ -105,11 +105,11 @@ Job 2 — monitor (daily cron):
 
 | Error | Fix |
 |-------|-----|
-| `HF_TOKEN secret is empty` | Re-add the secret in GitHub repo Settings → Secrets → Actions |
-| `workflow` scope error on push | Edit your GitHub PAT and check the `workflow` scope |
+| `HF_TOKEN secret is empty` | Re-add at [GitHub Secrets](https://github.com/irajkooh/Rag_mlop/settings/secrets/actions) |
+| `workflow` scope error on push | Edit PAT at [github.com/settings/tokens](https://github.com/settings/tokens) → check `workflow` |
 | `colorFrom` invalid | README.md `colorFrom` must be: red, yellow, green, blue, indigo, purple, pink, gray |
-| `401 Unauthorized` on HF upload | Token expired or wrong — renew at huggingface.co/settings/tokens |
-| Docker build fails on HF | Check **huggingface.co/spaces/irajkoohi/Rag_mlop** → Logs tab |
+| `401 Unauthorized` on HF upload | Renew token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
+| Docker build fails on HF | Check [HF Space Logs](https://huggingface.co/spaces/irajkoohi/Rag_mlop) → Logs tab |
 | Tests fail in CI | Run `pytest tests/ -v` locally first to reproduce |
 
 ---
@@ -125,7 +125,7 @@ git commit --allow-empty -m "ci: trigger deploy" && git push
 ## MLOps monitoring — what triggers and what to do
 
 The daily cron job (00:00 UTC) runs two checks against the live HF Space.
-Results appear in **github.com/irajkooh/Rag_mlop/actions** under the `monitor` job.
+Results appear in **[GitHub Actions](https://github.com/irajkooh/Rag_mlop/actions)** under the `monitor` job.
 
 ### Check 1 — Drift detection (`monitor/drift_check.py`)
 
@@ -178,7 +178,7 @@ This app has no trainable model weights — "retraining" means **refreshing the 
 ```
 Trigger (IDK rate too high or canary fail)
     ↓
-1. Go to huggingface.co/spaces/irajkoohi/Rag_mlop
+1. Go to [huggingface.co/spaces/irajkoohi/Rag_mlop](https://huggingface.co/spaces/irajkoohi/Rag_mlop)
 2. Open the Upload Documents tab
 3. Delete outdated files (Delete Selected or Delete All)
 4. Upload new/updated PDFs → they are re-indexed immediately
@@ -190,8 +190,8 @@ Trigger (IDK rate too high or canary fail)
 
 Add a Slack webhook to get alerts in a channel instead of only in GitHub Actions logs:
 
-1. Create an incoming webhook at **api.slack.com/apps**
-2. Add it as a GitHub secret: name `SLACK_WEBHOOK_URL`, value = the webhook URL
+1. Create an incoming webhook at **[api.slack.com/apps](https://api.slack.com/apps)**
+2. Add it as a GitHub secret at [GitHub Secrets](https://github.com/irajkooh/Rag_mlop/settings/secrets/actions): name `SLACK_WEBHOOK_URL`, value = the webhook URL
 3. Alerts are sent at three levels: `ℹ️ info`, `⚠️ warning`, `🚨 critical`
 
 ### Run monitoring manually
