@@ -119,3 +119,90 @@ Job 2 — monitor (daily cron):
 ```bash
 git commit --allow-empty -m "ci: trigger deploy" && git push
 ```
+
+---
+
+## MLOps monitoring — what triggers and what to do
+
+The daily cron job (00:00 UTC) runs two checks against the live HF Space.
+Results appear in **github.com/irajkooh/Rag_mlop/actions** under the `monitor` job.
+
+### Check 1 — Drift detection (`monitor/drift_check.py`)
+
+Hits `/logs/stats` on the live Space and checks:
+
+| Metric | Threshold | Alert level |
+|--------|-----------|-------------|
+| I-Don't-Know rate | > 50% (of last N queries) | 🚨 critical |
+| Average latency | > 5000 ms | ⚠️ warning |
+
+**What it means and what to do:**
+
+| Alert | Likely cause | Action |
+|-------|-------------|--------|
+| High IDK rate | Users are asking about topics not in your documents | Upload more/updated PDFs via the app UI, then re-index |
+| High IDK rate | Documents are outdated | Delete old files from the index, upload new versions |
+| High latency | Groq API quota hit | Check your Groq dashboard; the free tier has rate limits |
+| High latency | HF Space sleeping (free tier sleeps after 48h inactivity) | Open the Space URL to wake it; upgrade to paid HF tier to disable sleeping |
+
+### Check 2 — Accuracy / canary check (`monitor/accuracy_check.py`)
+
+Sends hardcoded questions to `/ask` and fails if any return "I Don't Know".
+**These questions must be ones your uploaded PDFs can answer.**
+
+**How to set up canary questions (one-time after first deploy):**
+
+1. Open your live Space, ask 3–5 questions you know your documents answer
+2. Edit `monitor/accuracy_check.py` and add them:
+   ```python
+   CANARY_QUESTIONS: list[str] = [
+       "What is Iraj's email address?",
+       "How many years of experience does Iraj have?",
+       "What LLM frameworks are mentioned?",
+   ]
+   ```
+3. Commit and push — they run every day automatically
+
+**What it means and what to do:**
+
+| Alert | Likely cause | Action |
+|-------|-------------|--------|
+| Canary question returned IDK | Knowledge base was cleared/reset on HF (ephemeral storage) | Re-upload your PDFs via the app UI |
+| Canary question returned IDK | PDF content changed and answer moved | Update the canary question or re-upload the new PDF |
+| Network error reaching Space | HF Space is sleeping or crashed | Wake the Space manually; check HF Logs tab |
+
+### Retraining equivalent for a RAG app
+
+This app has no trainable model weights — "retraining" means **refreshing the knowledge base**:
+
+```
+Trigger (IDK rate too high or canary fail)
+    ↓
+1. Go to huggingface.co/spaces/irajkoohi/Rag_mlop
+2. Open the Upload Documents tab
+3. Delete outdated files (Delete Selected or Delete All)
+4. Upload new/updated PDFs → they are re-indexed immediately
+5. Ask a test question to verify
+6. Monitor job will pass on next daily run (or re-run manually)
+```
+
+### Alerts channel — Slack (optional)
+
+Add a Slack webhook to get alerts in a channel instead of only in GitHub Actions logs:
+
+1. Create an incoming webhook at **api.slack.com/apps**
+2. Add it as a GitHub secret: name `SLACK_WEBHOOK_URL`, value = the webhook URL
+3. Alerts are sent at three levels: `ℹ️ info`, `⚠️ warning`, `🚨 critical`
+
+### Run monitoring manually
+
+```bash
+# From GitHub Actions UI:
+# Actions → CI/CD → HuggingFace Space → Run workflow → select main
+
+# Or trigger from terminal:
+git commit --allow-empty -m "ci: run monitoring" && git push
+# (The cron job only runs on schedule, not on push — to test locally:)
+SPACE_URL=https://irajkoohi-rag-mlop.hf.space python -m monitor.drift_check
+SPACE_URL=https://irajkoohi-rag-mlop.hf.space python -m monitor.accuracy_check
+```
