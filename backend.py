@@ -5,7 +5,7 @@ Vector store : ChromaDB  (persistent, cosine similarity)
 Embeddings   : sentence-transformers/all-MiniLM-L6-v2
                auto-moved to MPS → CUDA → CPU
 LLM          : Ollama (primary / local)
-               Groq llama3-8b-8192 (cloud fallback on HF Space)
+               Groq llama-3.1-8b-instant (cloud fallback on HF Space)
 Memory       : per-session history + LLM-based summarisation
 Logging      : JSONL prediction log for MLOps monitoring
 Status API   : /system/info → powers the UI status bar
@@ -45,7 +45,8 @@ for _d in [DATA_DIR, LOGS_DIR, CHROMA_DIR]:
 # ── Environment ────────────────────────────────────────────────────────────────
 OLLAMA_URL   = os.getenv("OLLAMA_URL",   "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL    = os.getenv("GROQ_MODEL",   "llama-3.1-8b-instant")
 IS_HF_SPACE  = bool(os.getenv("SPACE_ID", ""))
 
 
@@ -156,7 +157,7 @@ def call_groq(messages: list[dict], max_tokens: int = 512) -> str:
         raise RuntimeError("GROQ_API_KEY not set and Ollama unavailable.")
     import groq as _groq
     resp = _groq.Groq(api_key=GROQ_API_KEY).chat.completions.create(
-        model="llama3-8b-8192",
+        model=GROQ_MODEL,
         messages=messages,
         max_tokens=max_tokens,
         temperature=0.1,
@@ -177,7 +178,7 @@ def active_llm_label() -> str:
     if ollama_available():
         return f"Ollama · {OLLAMA_MODEL}"
     if GROQ_API_KEY:
-        return "Groq · llama3-8b"
+        return "Groq · llama-3.1-8b-instant"
     return "No LLM configured"
 
 
