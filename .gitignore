@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Environment variables & secrets — NEVER commit these
+.env
+*.env.local
+.GROQ_API_KEY.txt
+.HF_TOKEN.txt
+
+# ChromaDB vector store (rebuilt at runtime from uploaded PDFs)
+chroma_db/
+
+# Logs (generated at runtime — not committed)
+logs/
+*.jsonl
+*.log
+
+# Model cache (large files — downloaded at runtime)
+.cache/
+models/
+sentence_transformers_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Data files — personal PDFs not committed to public repo
+data/*.pdf
