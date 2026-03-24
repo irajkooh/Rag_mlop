@@ -1,6 +1,27 @@
 # Deploy to HuggingFace Spaces via GitHub
 
-## How it works
+# Required links:
+
+- GitHub Secrets — add HF_TOKEN, SLACK_WEBHOOK_URL
+https://github.com/irajkooh/Rag_mlop/settings/secrets/actions
+
+- HF Tokens — create/renew HF write token
+https://huggingface.co/settings/tokens
+
+- GitHub PAT — ensure workflow scope
+https://github.com/settings/tokens
+
+- HF Space Settings — add GROQ_API_KEY
+https://huggingface.co/spaces/irajkoohi/Rag_mlop/settings
+
+- GitHub Actions — monitor runs
+https://github.com/irajkooh/Rag_mlop/actions
+
+- HF Space — live app + logs
+https://huggingface.co/spaces/irajkoohi/Rag_mlop?logs=container
+
+
+###### How it works #####
 
 ```
 Local machine  →  git push  →  GitHub (main)  →  GitHub Actions CI/CD  →  HuggingFace Space
