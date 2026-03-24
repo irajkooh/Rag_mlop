@@ -49,6 +49,8 @@ GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL    = os.getenv("GROQ_MODEL",   "llama-3.1-8b-instant")
 IS_HF_SPACE  = bool(os.getenv("SPACE_ID", ""))
 
+logger.info(f"GROQ_API_KEY set: {bool(GROQ_API_KEY)} | model: {GROQ_MODEL} | HF Space: {IS_HF_SPACE}")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. Device detection — MPS (Apple Silicon) → CUDA → CPU
