@@ -57,12 +57,28 @@ jobs:
           python - <<'PYEOF'
           import os
           from huggingface_hub import HfApi
+
+          token = os.environ["HF_TOKEN"]
           api = HfApi()
+
+          # Verify token
+          user = api.whoami(token=token)
+          print(f"✅ Authenticated as: {user['name']}")
+
+          # Ensure space exists
+          api.create_repo(
+              repo_id="irajkoohi/Rag_mlop",
+              repo_type="space",
+              space_sdk="docker",
+              token=token,
+              exist_ok=True,
+          )
+
           api.upload_folder(
               folder_path=".",
               repo_id="irajkoohi/Rag_mlop",
               repo_type="space",
-              token=os.environ["HF_TOKEN"],
+              token=token,
               ignore_patterns=[
                   ".git", ".git/*", ".venv", ".venv/*",
                   "__pycache__", "**/__pycache__",
