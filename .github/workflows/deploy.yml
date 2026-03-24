@@ -58,7 +58,11 @@ jobs:
           import os
           from huggingface_hub import HfApi
 
-          token = os.environ["HF_TOKEN"]
+          token = os.environ.get("HF_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("❌ HF_TOKEN secret is empty — re-add it in GitHub repo Settings → Secrets")
+          print(f"Token present: yes, length={len(token)}, starts_with_hf={token.startswith('hf_')}")
+
           api = HfApi()
 
           # Verify token
