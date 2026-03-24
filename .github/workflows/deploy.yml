@@ -53,11 +53,27 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git config user.email "irajkooh@users.noreply.github.com"
-          git config user.name  "irajkooh"
-          git remote add hf \
-            https://irajkoohi:$HF_TOKEN@huggingface.co/spaces/irajkoohi/Rag_mlop
-          git push hf main --force
+          pip install huggingface_hub --quiet
+          python - <<'PYEOF'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi()
+          api.upload_folder(
+              folder_path=".",
+              repo_id="irajkoohi/Rag_mlop",
+              repo_type="space",
+              token=os.environ["HF_TOKEN"],
+              ignore_patterns=[
+                  ".git", ".git/*", ".venv", ".venv/*",
+                  "__pycache__", "**/__pycache__",
+                  "chroma_db", "chroma_db/*",
+                  "data/*.pdf",
+                  "logs", "logs/*",
+                  "*.pyc",
+              ],
+          )
+          print("✅ Deployed to HuggingFace Space")
+          PYEOF
 
       - name: Notify deploy success
         if: success()
