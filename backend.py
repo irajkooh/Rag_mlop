@@ -235,6 +235,41 @@ def index_pdf(pdf_path: Path) -> int:
     return len(chunks)
 
 
+def fetch_url_chunks(url: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
+    """Fetch a web page, extract main text, return overlapping chunks."""
+    import trafilatura
+    downloaded = trafilatura.fetch_url(url)
+    if not downloaded:
+        raise ValueError(f"Could not fetch URL: {url}")
+    text = trafilatura.extract(downloaded)
+    if not text:
+        raise ValueError(f"No extractable text found at: {url}")
+    chunks, start = [], 0
+    while start < len(text):
+        end   = min(start + chunk_size, len(text))
+        chunk = text[start:end].strip()
+        if len(chunk) > 30:
+            chunks.append(chunk)
+        start += chunk_size - overlap
+    chunks.append(f"Source URL: {url}")
+    return chunks
+
+
+def index_url(url: str) -> int:
+    from urllib.parse import urlparse
+    chunks = fetch_url_chunks(url)
+    if not chunks:
+        return 0
+    parsed      = urlparse(url)
+    source_name = (parsed.netloc + parsed.path).strip("/")[:80] or url[:80]
+    embeddings  = embedder.encode(chunks, show_progress_bar=False).tolist()
+    ids         = [f"{source_name}::{i}" for i in range(len(chunks))]
+    metadatas   = [{"source": source_name, "chunk_index": i, "url": url} for i in range(len(chunks))]
+    collection.upsert(ids=ids, documents=chunks, embeddings=embeddings, metadatas=metadatas)
+    logger.info(f"ChromaDB <- {len(chunks)} chunks from {url}")
+    return len(chunks)
+
+
 def build_knowledge_base() -> int:
     total = 0
     for pdf in DATA_DIR.glob("*.pdf"):
@@ -424,6 +459,22 @@ async def upload_pdf(file: UploadFile = File(...)):
         fh.write(await file.read())
     n = index_pdf(dest)
     return {"message": f"Uploaded and indexed {file.filename}", "chunks_added": n, "total_chunks": collection.count()}
+
+
+class UrlRequest(BaseModel):
+    url: str
+
+
+@app.post("/upload_url")
+def upload_url(req: UrlRequest):
+    url = req.url.strip()
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
+    try:
+        n = index_url(url)
+        return {"message": f"Indexed {url}", "chunks_added": n, "total_chunks": collection.count()}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @app.post("/reload")

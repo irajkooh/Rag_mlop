@@ -81,6 +81,23 @@ def upload_to_backend(file_path: str, filename: str | None = None) -> str:
         return f"❌ Upload failed: {e}"
 
 
+def upload_url_to_backend(url: str) -> str:
+    url = url.strip()
+    if not url:
+        return "⚠️  Please enter a URL."
+    try:
+        r = requests.post(
+            f"{BACKEND_URL}/upload_url",
+            json={"url": url},
+            timeout=60,
+        )
+        r.raise_for_status()
+        d = r.json()
+        return f"✅ {d['message']}  —  {d['chunks_added']} chunks added  |  total: {d['total_chunks']}"
+    except Exception as e:
+        return f"❌ URL indexing failed: {e}"
+
+
 def get_file_list() -> list:
     try:
         r = requests.get(f"{BACKEND_URL}/kb/status", timeout=10)
@@ -831,6 +848,18 @@ def build_ui() -> gr.Blocks:
                         )
 
                         gr.HTML("<hr class='divider'>")
+                        gr.HTML("<p style='font-family:monospace;font-size:11px;color:#6b7d96;margin-bottom:4px;'>🌐 Index a web page URL</p>")
+                        with gr.Row():
+                            with gr.Column(scale=5):
+                                url_input = gr.Textbox(
+                                    placeholder="https://example.com/article",
+                                    show_label=False,
+                                    lines=1,
+                                )
+                            with gr.Column(scale=2, min_width=130, elem_classes="btn-send"):
+                                url_btn = gr.Button("🌐 Add URL", variant="primary")
+
+                        gr.HTML("<hr class='divider'>")
                         gr.HTML("<p style='font-family:monospace;font-size:11px;color:#6b7d96;margin-bottom:4px;'>🗂️ Select files to delete</p>")
 
                         file_selector = gr.CheckboxGroup(
@@ -885,6 +914,24 @@ def build_ui() -> gr.Blocks:
                     inputs=[pdf_upload],
                     outputs=[upload_status, file_selector, kb_status_out, delete_sel_btn, delete_all_btn],
                 )
+
+                def handle_url(url):
+                    msg   = upload_url_to_backend(url)
+                    files = get_file_list()
+                    s, d  = btn_state(files)
+                    return msg, "", gr.update(choices=files, value=[]), get_kb_status(), s, d
+
+                url_btn.click(
+                    handle_url,
+                    inputs=[url_input],
+                    outputs=[upload_status, url_input, file_selector, kb_status_out, delete_sel_btn, delete_all_btn],
+                )
+                url_input.submit(
+                    handle_url,
+                    inputs=[url_input],
+                    outputs=[upload_status, url_input, file_selector, kb_status_out, delete_sel_btn, delete_all_btn],
+                )
+
                 refresh_kb.click(
                     lambda: (file_selector_update(), get_kb_status()),
                     inputs=[],
