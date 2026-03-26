@@ -13,12 +13,12 @@ LLM          : Ollama primary · Groq fallback  (via backend)
 Design       : deep navy + electric blue + teal accent, Space Mono / DM Sans
 """
 
+import asyncio
 import gradio as gr
 import requests
 import uuid
 import os
 import re
-import threading
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
@@ -767,31 +767,20 @@ def build_ui() -> gr.Blocks:
                 """)
 
                 # ── Event wiring ─────────────────────────────────────────
-                def on_send(msg, hist, sid):
+                async def on_send(msg, hist, sid):
                     if not msg.strip():
                         yield hist, sid, msg, "", hist, ""
                         return
-                    # Show user question in chatbot immediately, no thinking bubble
+                    # Show user question immediately; progress bar appears below input
                     with_question = hist + [{"role": "user", "content": msg}]
-                    # 5th = snapshot for Stop restore, 6th = progress bar HTML
                     yield with_question, sid, "", "", hist, _THINKING_HTML
 
-                    # Run backend call in a thread so we can yield while waiting,
-                    # giving Gradio a cancellation point every 0.5 s
-                    result: list = []
-                    t = threading.Thread(
-                        target=lambda: result.append(chat(msg, hist, sid)),
-                        daemon=True,
+                    # Await blocking chat() in thread-pool — Gradio can cancel HERE
+                    loop = asyncio.get_event_loop()
+                    new_hist, new_sid, _, plain = await loop.run_in_executor(
+                        None, lambda: chat(msg, hist, sid)
                     )
-                    t.start()
-                    while t.is_alive():
-                        t.join(timeout=0.5)
-                        if t.is_alive():
-                            yield with_question, sid, "", "", hist, _THINKING_HTML
-
-                    if result:
-                        new_hist, sid, _, plain = result[0]
-                        yield new_hist, sid, "", plain, new_hist, ""  # hide bar
+                    yield new_hist, new_sid, "", plain, new_hist, ""
 
                 _SCROLL_JS = """() => {
                     const c = document.querySelector('#chatbot');
@@ -835,8 +824,9 @@ def build_ui() -> gr.Blocks:
                 )
 
                 def make_sq_handler(question):
-                    def handler(hist, sid):
-                        yield from on_send(question, hist, sid)
+                    async def handler(hist, sid):
+                        async for val in on_send(question, hist, sid):
+                            yield val
                     return handler
 
                 for q, btn in sq_btns:
