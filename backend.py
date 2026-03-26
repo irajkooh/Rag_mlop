@@ -35,7 +35,14 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s — %(me
 logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BASE_DIR     = Path(__file__).parent
+BASE_DIR   = Path(__file__).parent
+DATA_DIR   = BASE_DIR / "data"
+LOGS_DIR   = BASE_DIR / "logs"
+CHROMA_DIR = BASE_DIR / "chroma_db"
+URLS_FILE  = DATA_DIR / "indexed_urls.txt"   # persists URLs for re-index on startup
+
+for _d in [DATA_DIR, LOGS_DIR, CHROMA_DIR]:
+    _d.mkdir(exist_ok=True)
 
 # ── Environment ────────────────────────────────────────────────────────────────
 OLLAMA_URL   = os.getenv("OLLAMA_URL",   "http://localhost:11434")
@@ -43,23 +50,6 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL    = os.getenv("GROQ_MODEL",   "llama-3.1-8b-instant")
 IS_HF_SPACE  = bool(os.getenv("SPACE_ID", ""))
-
-# On HF Space use the persistent /data volume so files survive restarts/redeploys.
-# Locally keep everything relative to the project directory (unchanged behaviour).
-if IS_HF_SPACE:
-    _storage = Path("/data/rag")
-    DATA_DIR   = _storage / "data"
-    LOGS_DIR   = _storage / "logs"
-    CHROMA_DIR = _storage / "chroma_db"
-else:
-    DATA_DIR   = BASE_DIR / "data"
-    LOGS_DIR   = BASE_DIR / "logs"
-    CHROMA_DIR = BASE_DIR / "chroma_db"
-
-URLS_FILE = DATA_DIR / "indexed_urls.txt"   # persists URLs for re-index on startup
-
-for _d in [DATA_DIR, LOGS_DIR, CHROMA_DIR]:
-    _d.mkdir(exist_ok=True, parents=True)
 
 logger.info(f"GROQ_API_KEY set: {bool(GROQ_API_KEY)} | model: {GROQ_MODEL} | HF Space: {IS_HF_SPACE}")
 
