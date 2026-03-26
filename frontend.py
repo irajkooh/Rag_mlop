@@ -600,33 +600,12 @@ button.secondary:hover, .btn-action button:hover {
 }
 .upload-zone:hover { border-color: var(--blue) !important; }
 
-/* ── Thinking progress bar ───────────────────────────────────────────── */
-.thinking-bar-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 5px 2px 2px;
-    min-height: 22px;
-}
-.thinking-bar {
-    flex: 1;
-    height: 3px;
-    background: linear-gradient(90deg, var(--blue-dark) 0%, var(--blue-light) 50%, var(--blue-dark) 100%);
-    background-size: 200% 100%;
-    border-radius: 2px;
-    animation: thinking-slide 1.4s ease-in-out infinite;
-}
-@keyframes thinking-slide {
-    0%   { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
-}
-.thinking-label {
-    font-size: 11px;
-    color: var(--blue-light);
-    font-family: 'Space Mono', monospace;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-    opacity: 0.85;
+/* ── Thinking state — question box shows amber "Thinking…" ──────────── */
+#question-input textarea:disabled,
+#question-input textarea[disabled] {
+    color: var(--amber) !important;
+    -webkit-text-fill-color: var(--amber) !important;
+    opacity: 1 !important;
 }
 
 /* ── Divider ─────────────────────────────────────────────────────────── */
@@ -709,6 +688,7 @@ def build_ui() -> gr.Blocks:
                             show_label=False,
                             lines=1,
                             max_lines=5,
+                            elem_id="question-input",
                         )
                     with gr.Column(scale=2, min_width=120):
                         with gr.Column(elem_classes="btn-send"):
@@ -717,13 +697,6 @@ def build_ui() -> gr.Blocks:
                             stop_btn = gr.Button("⏹ Stop")
                         with gr.Column(elem_classes="btn-read"):
                             read_btn = gr.Button("🔊 Read Last")
-
-                # Progress bar — shown while backend is thinking, hidden otherwise
-                _THINKING_HTML = """<div class="thinking-bar-wrap">
-                    <div class="thinking-bar"></div>
-                    <span class="thinking-label">Thinking…</span>
-                </div>"""
-                thinking_bar = gr.HTML(value="")
 
                 gr.HTML("<hr class='divider'>")
 
@@ -769,18 +742,14 @@ def build_ui() -> gr.Blocks:
                 # ── Event wiring ─────────────────────────────────────────
                 async def on_send(msg, hist, sid):
                     if not msg.strip():
-                        yield hist, sid, msg, "", hist, ""
+                        yield hist, sid, gr.update(value=msg, interactive=True), "", hist
                         return
-                    # Show user question immediately; progress bar appears below input
                     with_question = hist + [{"role": "user", "content": msg}]
-                    yield with_question, sid, "", "", hist, _THINKING_HTML
-
-                    # Await blocking chat() in thread-pool — Gradio can cancel HERE
-                    loop = asyncio.get_event_loop()
-                    new_hist, new_sid, _, plain = await loop.run_in_executor(
-                        None, lambda: chat(msg, hist, sid)
-                    )
-                    yield new_hist, new_sid, "", plain, new_hist, ""
+                    # Disable textbox and show "Thinking…" in amber while waiting
+                    yield with_question, sid, gr.update(value="Thinking…", interactive=False), "", hist
+                    await asyncio.sleep(0)  # flush UI before blocking call
+                    new_hist, new_sid, _, plain = chat(msg, hist, sid)
+                    yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
 
                 _SCROLL_JS = """() => {
                     const c = document.querySelector('#chatbot');
@@ -796,13 +765,13 @@ def build_ui() -> gr.Blocks:
                 send_event = send_btn.click(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
-                    outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot, thinking_bar],
+                    outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
                 )
                 send_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                 submit_event = user_input.submit(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
-                    outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot, thinking_bar],
+                    outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
                 )
                 submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
@@ -818,9 +787,9 @@ def build_ui() -> gr.Blocks:
                 #    and hide the progress bar. Uses hist_snapshot (not chatbot) as input
                 #    so Gradio's "fn+cancels" input-override bug does NOT apply here.
                 stop_btn.click(
-                    fn=lambda h: (h, ""),
+                    fn=lambda h: (h, gr.update(value="", interactive=True)),
                     inputs=[hist_snapshot],
-                    outputs=[chatbot, thinking_bar],
+                    outputs=[chatbot, user_input],
                 )
 
                 def make_sq_handler(question):
@@ -833,7 +802,7 @@ def build_ui() -> gr.Blocks:
                     btn.click(
                         make_sq_handler(q),
                         inputs=[chatbot, session_id],
-                        outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot, thinking_bar],
+                        outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
                     ).then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
                 clear_btn.click(
