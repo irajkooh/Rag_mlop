@@ -371,18 +371,21 @@ def answer_question(question: str, chunks: list[dict], summary: str, system_info
         n_files   = len(files)
         file_list = ", ".join(files) if files else "none"
         meta = (
-            f"\nSYSTEM INFO (use this to answer questions about the assistant or its documents):\n"
+            f"\nSYSTEM INFO (AUTHORITATIVE — always use this for questions about file count, "
+            f"document names, or system status; never count from CONTEXT for these):\n"
             f"- You are a RAG-powered document Q&A assistant.\n"
             f"- You can answer questions from uploaded PDF documents using semantic search.\n"
-            f"- Currently {n_files} document(s) are indexed ({n_chunks} chunks): {file_list}.\n"
+            f"- Exactly {n_files} document(s) are currently indexed ({n_chunks} total chunks).\n"
+            f"- Indexed document names: {file_list}.\n"
             f"- You can also summarise, compare, and reason over the document contents.\n"
         )
     else:
         meta = ""
 
     doc_instruction = (
-        "Answer using the CONTEXT section below. "
-        "If the answer is not in the context but is answerable from SYSTEM INFO, use that. "
+        "Answer using the CONTEXT section below for questions about document content. "
+        "For questions about the system, file count, or document names, "
+        "use SYSTEM INFO — it is the authoritative source; do NOT count sources in CONTEXT. "
         "If neither contains the answer, respond with: "
         "\"I Don't Know — the answer is not in the provided documents.\" "
     ) if chunks else (
