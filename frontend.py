@@ -749,8 +749,12 @@ def build_ui() -> gr.Blocks:
                     with_question = hist + [{"role": "user", "content": msg}]
                     # Disable textbox and show "Thinking…" in amber while waiting
                     yield with_question, sid, gr.update(value="Thinking…", interactive=False), "", hist
-                    await asyncio.sleep(0)  # flush UI before blocking call
-                    new_hist, new_sid, _, plain = chat(msg, hist, sid)
+                    # run_in_executor keeps the event loop free so Stop's /cancel
+                    # request can be received and processed during the backend call
+                    loop = asyncio.get_event_loop()
+                    new_hist, new_sid, _, plain = await loop.run_in_executor(
+                        None, lambda: chat(msg, hist, sid)
+                    )
                     yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
 
                 _SCROLL_JS = """() => {
