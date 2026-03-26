@@ -21,6 +21,7 @@ import os
 import re
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+IS_HF_SPACE = bool(os.getenv("SPACE_ID", ""))
 
 # _chat_busy  — prevents concurrent sends (second click is a no-op)
 # _chat_gen   — incremented by Stop; on_send checks it before yielding the answer
@@ -916,8 +917,7 @@ def build_ui() -> gr.Blocks:
                             height=200,
                         )
                         with gr.Row():
-                            upload_btn = gr.Button("⬆️ Upload & Index", variant="primary")
-                            refresh_kb  = gr.Button("🔄 Refresh",       variant="secondary")
+                            refresh_kb = gr.Button("🔄 Refresh", variant="secondary")
 
                         upload_status = gr.Textbox(
                             label="Upload Status",
@@ -989,7 +989,7 @@ def build_ui() -> gr.Blocks:
                     s, d = btn_state(files)
                     return "\n".join(results), gr.update(choices=files, value=[]), get_kb_status(), s, d
 
-                upload_btn.click(
+                pdf_upload.change(
                     handle_upload,
                     inputs=[pdf_upload],
                     outputs=[upload_status, file_selector, kb_status_out, delete_sel_btn, delete_all_btn],
@@ -1042,6 +1042,25 @@ def build_ui() -> gr.Blocks:
                     inputs=[],
                     outputs=[upload_status, file_selector, kb_status_out, confirm_row, delete_sel_btn, delete_all_btn],
                 )
+
+        # Space-only: wipe all docs whenever a browser session (re)loads the page.
+        # Handles the case where the Space container slept but didn't restart —
+        # EphemeralClient keeps data in memory across sleep/wake cycles.
+        if IS_HF_SPACE:
+            def _wipe_on_load():
+                try:
+                    requests.delete(f"{BACKEND_URL}/files", timeout=30)
+                except Exception:
+                    pass
+                files = get_file_list()
+                s, d = btn_state(files)
+                return "", gr.update(choices=files, value=[]), get_kb_status(), s, d
+
+            demo.load(
+                _wipe_on_load,
+                inputs=[],
+                outputs=[upload_status, file_selector, kb_status_out, delete_sel_btn, delete_all_btn],
+            )
 
         # ── Footer ────────────────────────────────────────────────────────
         gr.HTML("""
