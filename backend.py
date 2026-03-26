@@ -238,14 +238,33 @@ def index_pdf(pdf_path: Path) -> int:
 def fetch_url_chunks(url: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
     """Fetch a web page, extract main text, return overlapping chunks."""
     import trafilatura
-    downloaded = trafilatura.fetch_url(url)
-    if not downloaded:
+
+    # Try requests with a browser User-Agent first (bypasses basic bot blocks)
+    html = None
+    try:
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        resp = _http.get(url, headers=headers, timeout=20, allow_redirects=True)
+        if resp.status_code == 200:
+            html = resp.text
+    except Exception:
+        pass
+
+    # Fall back to trafilatura's own fetcher
+    if not html:
+        html = trafilatura.fetch_url(url)
+    if not html:
         raise ValueError(f"Could not fetch page (blocked or unreachable): {url}")
-    # trafilatura 2.x may return a Document; extract handles both str and Document
-    text = trafilatura.extract(downloaded, include_comments=False, include_tables=True)
+
+    text = trafilatura.extract(html, include_comments=False, include_tables=True)
     if not text:
-        # fallback: try with favour_recall to be less strict
-        text = trafilatura.extract(downloaded, favour_recall=True)
+        text = trafilatura.extract(html, favour_recall=True)
     if not text:
         raise ValueError(f"No extractable text at this URL (page may require JavaScript or login): {url}")
     chunks, start = [], 0
