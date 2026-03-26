@@ -730,8 +730,16 @@ def build_ui() -> gr.Blocks:
 
                 # ── Event wiring ─────────────────────────────────────────
                 def on_send(msg, hist, sid):
-                    hist, sid, _, plain = chat(msg, hist, sid)
-                    return hist, sid, "", plain
+                    if not msg.strip():
+                        yield hist, sid, msg, ""
+                        return
+                    # Yield a "thinking" state immediately so Stop can cancel cleanly
+                    thinking = hist + [{"role": "user", "content": msg},
+                                       {"role": "assistant", "content": "⏳ *Thinking…*"}]
+                    yield thinking, sid, "", ""
+                    # Now call the backend
+                    new_hist, sid, _, plain = chat(msg, hist, sid)
+                    yield new_hist, sid, "", plain
 
                 _SCROLL_JS = """() => {
                     const c = document.querySelector('#chatbot');
