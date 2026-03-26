@@ -1,5 +1,11 @@
 # 🔍 How It Works — Code Explained
 
+# Local machine  →  git push  →  GitHub (main)  →  GitHub Actions CI/CD  →  HuggingFace Space
+
+1. You make code changes on your local machine.
+2. You run git push to send those changes to the main branch on GitHub.
+3. GitHub Actions (CI/CD workflow) is triggered by this push. It runs pytest to check the logic and correctness of your code, then builds, and deploys to HF Space.
+4. HuggingFace Space then rebuilds and restarts your app.
 ---
 
 ## app.py — Entry Point

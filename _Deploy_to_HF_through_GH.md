@@ -20,9 +20,16 @@ https://github.com/irajkooh/Rag_mlop/actions
 - HF Space — live app + logs
 https://huggingface.co/spaces/irajkoohi/Rag_mlop?logs=container
 
+# After deploy is done to HF space, and we changed anything in codes:
+# Just:
+git add <changed files>
+git commit -m "your message"
+git push
+# That's it. GitHub Actions runs automatically, deploys to HF Space, and the Space rebuilds.
 
-###### How it works #####
-
+# ###############################################
+###### How it works ######
+# ##############################################
 ```
 Local machine  →  git push  →  GitHub (main)  →  GitHub Actions CI/CD  →  HuggingFace Space
 ```
@@ -37,12 +44,12 @@ Every push to `main` automatically:
 
 ## One-time setup (already done)
 
-| What | Where |
-|------|-------|
-| GitHub repo | [github.com/irajkooh/Rag_mlop](https://github.com/irajkooh/Rag_mlop) |
-| HF Space | [huggingface.co/spaces/irajkoohi/Rag_mlop](https://huggingface.co/spaces/irajkoohi/Rag_mlop) |
-| Workflow file | `.github/workflows/deploy.yml` |
-| GitHub secret | `HF_TOKEN` = your HF user access token |
+|   What   |                                           Where                                                      |
+|----------|------------------------------------------------------------------------------------------------------|
+| GitHub   | repo   github.com/irajkooh/Rag_mlop](https://github.com/irajkooh/Rag_mlop)                           | 
+| HF       | Space  [huggingface.co/spaces/irajkoohi/Rag_mlop](https://huggingface.co/spaces/irajkoohi/Rag_mlop)  |
+| Workflow | file   `.github/workflows/deploy.yml`                                                                |
+| GitHub   | secret `HF_TOKEN` = your HF user access token                                                        |
 
 ### GitHub secret required
 Go to **[GitHub → Secrets → Actions](https://github.com/irajkooh/Rag_mlop/settings/secrets/actions)** and ensure:
@@ -51,7 +58,7 @@ Go to **[GitHub → Secrets → Actions](https://github.com/irajkooh/Rag_mlop/se
 
 Get/renew your token at **[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)** — needs **write** access.
 
-### GitHub PAT required (for pushing workflow files)
+### GitHub PAT (Personal Access Token) required (for pushing workflow files)
 Your GitHub Personal Access Token needs the **`workflow`** scope.
 Go to **[github.com/settings/tokens](https://github.com/settings/tokens)** → Edit → check ☑️ `workflow` → Update token.
 
@@ -78,14 +85,14 @@ git push
 
 ## What is NOT committed (`.gitignore`)
 
-| Excluded | Reason |
-|----------|--------|
-| `.venv/` | Local Python environment |
-| `chroma_db/` | Vector store — rebuilt when PDFs are uploaded via UI |
-| `data/*.pdf` | Your personal documents — upload through the app UI |
-| `logs/` | Runtime logs |
-| `.GROQ_API_KEY.txt` | Secret — set in HF Space Secrets instead |
-| `.HF_TOKEN.txt` | Secret — never commit tokens |
+|      Excluded       |                  Reason                              |
+|---------------------|------------------------------------------------------|
+| `.venv/`            | Local Python environment                             |
+| `chroma_db/`        | Vector store — rebuilt when PDFs are uploaded via UI |
+| `data/*.pdf`        | Your personal documents — upload through the app UI  |
+| `logs/`             | Runtime logs                                         |
+| `.GROQ_API_KEY.txt` | Secret — set in HF Space Secrets instead             |
+| `.HF_TOKEN.txt`     | Secret — never commit tokens                         |
 
 ---
 
@@ -93,10 +100,10 @@ git push
 
 Set these in **[HF Space Settings](https://huggingface.co/spaces/irajkoohi/Rag_mlop/settings)**:
 
-| Variable | Description |
-|----------|-------------|
-| `GROQ_API_KEY` | Groq API key — fallback LLM when Ollama is unavailable |
-| `OLLAMA_URL` | Optional — only if you run Ollama externally |
+|    Variable   |                       Description                      |
+|---------------|--------------------------------------------------------|
+| `GROQ_API_KEY`| Groq API key — fallback LLM when Ollama is unavailable |
+| `OLLAMA_URL`  | Optional — only if you run Ollama externally           |
 
 ---
 
@@ -124,14 +131,14 @@ Job 2 — monitor (daily cron):
 
 ## Troubleshooting
 
-| Error | Fix |
-|-------|-----|
-| `HF_TOKEN secret is empty` | Re-add at [GitHub Secrets](https://github.com/irajkooh/Rag_mlop/settings/secrets/actions) |
-| `workflow` scope error on push | Edit PAT at [github.com/settings/tokens](https://github.com/settings/tokens) → check `workflow` |
-| `colorFrom` invalid | README.md `colorFrom` must be: red, yellow, green, blue, indigo, purple, pink, gray |
-| `401 Unauthorized` on HF upload | Renew token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) |
-| Docker build fails on HF | Check [HF Space Logs](https://huggingface.co/spaces/irajkoohi/Rag_mlop) → Logs tab |
-| Tests fail in CI | Run `pytest tests/ -v` locally first to reproduce |
+|              Error             |                                           Fix                                                       |
+|--------------------------------|-----------------------------------------------------------------------------------------------------|
+| `HF_TOKEN secret is empty`     | Re-add at [GitHub Secrets](https://github.com/irajkooh/Rag_mlop/settings/secrets/actions)           |
+| `workflow` scope error on push | Edit PAT at [github.com/settings/tokens](https://github.com/settings/tokens) → check `workflow`     |
+| `colorFrom` invalid            | README.md `colorFrom`must be: red, yellow, green, blue, indigo, purple, pink, gray                  |
+| `401 Unauthorized` on HF upload| Renew token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)             |
+| Docker build fails on HF       | Check [HF Space Logs](https://huggingface.co/spaces/irajkoohi/Rag_mlop) → Logs tab                  |
+| Tests fail in CI               | Run `pytest tests/ -v` locally first to reproduce                                                   |
 
 ---
 
@@ -152,19 +159,19 @@ Results appear in **[GitHub Actions](https://github.com/irajkooh/Rag_mlop/action
 
 Hits `/logs/stats` on the live Space and checks:
 
-| Metric | Threshold | Alert level |
-|--------|-----------|-------------|
-| I-Don't-Know rate | > 50% (of last N queries) | 🚨 critical |
-| Average latency | > 5000 ms | ⚠️ warning |
+|      Metric       |        Threshold          |  Alert level  |
+|-------------------|---------------------------|---------------|
+| I-Don't-Know rate | > 50% (of last N queries) | 🚨 critical   |
+| Average latency   | > 5000 ms                 |  ⚠️ warning   |
 
 **What it means and what to do:**
 
-| Alert | Likely cause | Action |
-|-------|-------------|--------|
-| High IDK rate | Users are asking about topics not in your documents | Upload more/updated PDFs via the app UI, then re-index |
-| High IDK rate | Documents are outdated | Delete old files from the index, upload new versions |
-| High latency | Groq API quota hit | Check your Groq dashboard; the free tier has rate limits |
-| High latency | HF Space sleeping (free tier sleeps after 48h inactivity) | Open the Space URL to wake it; upgrade to paid HF tier to disable sleeping |
+|      Alert     |                     Likely cause                          |                                  Action                                    |
+|----------------|-----------------------------------------------------------|----------------------------------------------------------------------------|
+| High IDK rate  | Users are asking about topics not in your documents       | Upload more/updated PDFs via the app UI, then re-index                     |
+| High IDK rate  | Documents are outdated                                    | Delete old files from the index, upload new versions                       |
+| High latency   | Groq API quota hit                                        | Check your Groq dashboard; the free tier has rate limits                   |
+| High latency   | HF Space sleeping (free tier sleeps after 48h inactivity) | Open the Space URL to wake it; upgrade to paid HF tier to disable sleeping |
 
 ### Check 2 — Accuracy / canary check (`monitor/accuracy_check.py`)
 
@@ -186,11 +193,11 @@ Sends hardcoded questions to `/ask` and fails if any return "I Don't Know".
 
 **What it means and what to do:**
 
-| Alert | Likely cause | Action |
-|-------|-------------|--------|
-| Canary question returned IDK | Knowledge base was cleared/reset on HF (ephemeral storage) | Re-upload your PDFs via the app UI |
-| Canary question returned IDK | PDF content changed and answer moved | Update the canary question or re-upload the new PDF |
-| Network error reaching Space | HF Space is sleeping or crashed | Wake the Space manually; check HF Logs tab |
+|             Alert            |                       Likely cause                         |                       Action                       |
+|------------------------------|------------------------------------------------------------|----------------------------------------------------|
+| Canary question returned IDK | Knowledge base was cleared/reset on HF (ephemeral storage) | Re-upload your PDFs via the app UI                 |
+| Canary question returned IDK | PDF content changed and answer moved                       | Update the canary question or re-upload the new PDF|
+| Network error reaching Space | HF Space is sleeping or crashed                            | Wake the Space manually; check HF Logs tab         |
 
 ### Retraining equivalent for a RAG app
 
