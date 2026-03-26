@@ -623,8 +623,9 @@ def build_ui() -> gr.Blocks:
     with gr.Blocks(css=CSS, title="RAG Knowledge Assistant", theme=gr.themes.Base()) as demo:
 
         # ── Shared state ───────────────────────────────────────────────────
-        session_id  = gr.State(str(uuid.uuid4()))
-        last_answer = gr.State("")          # plain text kept for TTS
+        session_id    = gr.State(str(uuid.uuid4()))
+        last_answer   = gr.State("")        # plain text kept for TTS
+        hist_snapshot = gr.State([])        # clean history snapshot for Stop restore
 
         # ══════════════════════════════════════════════════════════════════
         # BLUE STATUS BAR  (top of page)
@@ -732,11 +733,12 @@ def build_ui() -> gr.Blocks:
                 # ── Event wiring ─────────────────────────────────────────
                 def on_send(msg, hist, sid):
                     if not msg.strip():
-                        yield hist, sid, msg, ""
+                        yield hist, sid, msg, "", hist
                         return
                     thinking = hist + [{"role": "user", "content": msg},
                                        {"role": "assistant", "content": "⏳ *Thinking…*"}]
-                    yield thinking, sid, "", ""
+                    # 5th output = snapshot of clean history (before question) for Stop restore
+                    yield thinking, sid, "", "", hist
 
                     # Run backend call in a thread so we can yield while waiting,
                     # giving Gradio a cancellation point every 0.5 s
@@ -749,11 +751,11 @@ def build_ui() -> gr.Blocks:
                     while t.is_alive():
                         t.join(timeout=0.5)
                         if t.is_alive():
-                            yield thinking, sid, "", ""  # still waiting
+                            yield thinking, sid, "", "", hist  # still waiting
 
                     if result:
                         new_hist, sid, _, plain = result[0]
-                        yield new_hist, sid, "", plain
+                        yield new_hist, sid, "", plain, new_hist
 
                 _SCROLL_JS = """() => {
                     const c = document.querySelector('#chatbot');
@@ -769,34 +771,32 @@ def build_ui() -> gr.Blocks:
                 send_event = send_btn.click(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
-                    outputs=[chatbot, session_id, user_input, last_answer],
+                    outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
                 )
                 send_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                 submit_event = user_input.submit(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
-                    outputs=[chatbot, session_id, user_input, last_answer],
+                    outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
                 )
                 submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
                 # Two separate click events on stop_btn:
-                # 1. Cancel the running generator (no fn — avoids Gradio overriding inputs)
+                # 1. Cancel the running generator (no fn — avoids Gradio input-override bug)
                 stop_btn.click(
                     fn=None,
                     inputs=None,
                     outputs=None,
                     cancels=[send_event, submit_event],
                 )
-                # 2. Clean up the thinking bubble from chatbot
-                def on_stop(history):
-                    h = list(history)
-                    if h and "Thinking" in h[-1].get("content", ""):
-                        h.pop()
-                        if h and h[-1].get("role") == "user":
-                            h.pop()
-                    return h
-
-                stop_btn.click(fn=on_stop, inputs=[chatbot], outputs=[chatbot])
+                # 2. Restore chatbot to the snapshot taken just before the question was sent.
+                #    Uses hist_snapshot (not chatbot) as input so Gradio's "fn+cancels" bug
+                #    (which overrides inputs with session_hash) does NOT apply here.
+                stop_btn.click(
+                    fn=lambda h: h,
+                    inputs=[hist_snapshot],
+                    outputs=[chatbot],
+                )
 
                 def make_sq_handler(question):
                     def handler(hist, sid):
@@ -807,7 +807,7 @@ def build_ui() -> gr.Blocks:
                     btn.click(
                         make_sq_handler(q),
                         inputs=[chatbot, session_id],
-                        outputs=[chatbot, session_id, user_input, last_answer],
+                        outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
                     ).then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
                 clear_btn.click(
