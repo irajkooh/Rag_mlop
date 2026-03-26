@@ -600,14 +600,6 @@ button.secondary:hover, .btn-action button:hover {
 }
 .upload-zone:hover { border-color: var(--blue) !important; }
 
-/* ── Thinking state — question box shows amber "Thinking…" ──────────── */
-#question-input textarea:disabled,
-#question-input textarea[disabled] {
-    color: var(--amber) !important;
-    -webkit-text-fill-color: var(--amber) !important;
-    opacity: 1 !important;
-}
-
 /* ── Divider ─────────────────────────────────────────────────────────── */
 .divider { height:1px; background: var(--surface2); margin:4px 0 8px; border:none; }
 
@@ -747,8 +739,7 @@ def build_ui() -> gr.Blocks:
                         yield hist, sid, gr.update(value=msg, interactive=True), "", hist
                         return
                     with_question = hist + [{"role": "user", "content": msg}]
-                    # Disable textbox and show "Thinking…" in amber while waiting
-                    yield with_question, sid, gr.update(value="Thinking…", interactive=False), "", hist
+                    yield with_question, sid, gr.update(value="", interactive=False), "", hist
                     # run_in_executor keeps the event loop free so Stop's /cancel
                     # request can be received and processed during the backend call
                     loop = asyncio.get_event_loop()
