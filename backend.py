@@ -286,7 +286,8 @@ def fetch_url_chunks(url: str, chunk_size: int = 500, overlap: int = 50) -> list
     return chunks
 
 
-def index_url(url: str) -> int:
+def _index_single_url(url: str) -> int:
+    """Index one URL; returns number of chunks added."""
     from urllib.parse import urlparse
     chunks = fetch_url_chunks(url)
     if not chunks:
@@ -299,6 +300,51 @@ def index_url(url: str) -> int:
     collection.upsert(ids=ids, documents=chunks, embeddings=embeddings, metadatas=metadatas)
     logger.info(f"ChromaDB <- {len(chunks)} chunks from {url}")
     return len(chunks)
+
+
+def _extract_links(html: str, base_url: str) -> list[str]:
+    """Return same-domain absolute links found in html."""
+    from urllib.parse import urlparse, urljoin
+    import re
+    parsed_base = urlparse(base_url)
+    base_domain = parsed_base.netloc
+    hrefs = re.findall(r'href=["\']([^"\'#?][^"\']*)["\']', html)
+    links = []
+    for href in hrefs:
+        abs_url = urljoin(base_url, href)
+        p = urlparse(abs_url)
+        if p.netloc == base_domain and p.scheme in ("http", "https"):
+            clean = p.scheme + "://" + p.netloc + p.path
+            if clean not in links:
+                links.append(clean)
+    return links[:20]   # cap at 20 child links per page
+
+
+def index_url(url: str, depth: int = 2) -> int:
+    """Index url and, if depth > 1, follow same-domain links one level deeper."""
+    total = _index_single_url(url)
+
+    if depth > 1:
+        # Fetch root HTML to extract child links
+        try:
+            import requests as _req
+            headers = {"User-Agent": "Mozilla/5.0"}
+            resp = _req.get(url, headers=headers, timeout=20, allow_redirects=True)
+            child_links = _extract_links(resp.text, url) if resp.status_code == 200 else []
+        except Exception:
+            child_links = []
+
+        seen = {url}
+        for child in child_links:
+            if child in seen:
+                continue
+            seen.add(child)
+            try:
+                total += _index_single_url(child)
+            except Exception as e:
+                logger.warning(f"Skipped {child}: {e}")
+
+    return total
 
 
 def build_knowledge_base() -> int:
@@ -341,6 +387,7 @@ def retrieve_relevant_chunks(query: str, top_k: int = 4) -> list[dict]:
             chunks.append({
                 "text":   doc,
                 "source": meta.get("source", "unknown"),
+                "url":    meta.get("url"),          # None for PDFs, full URL for web docs
                 "score":  round(similarity, 3),
             })
     return chunks
@@ -368,7 +415,10 @@ def summarize_history(history: list[dict]) -> str:
 
 
 def answer_question(question: str, chunks: list[dict], summary: str, system_info: dict | None = None) -> str:
-    context       = "\n\n".join(f"[Source: {c['source']}]\n{c['text']}" for c in chunks)
+    def _src_label(c):
+        url = c.get("url")
+        return f"[Source: {url if url else c['source']}]"
+    context = "\n\n".join(f"{_src_label(c)}\n{c['text']}" for c in chunks)
     history_block = f"\nConversation so far:\n{summary}\n" if summary else ""
 
     # Build system meta-context so the LLM can answer questions about itself
@@ -578,7 +628,7 @@ def ask(req: QuestionRequest):
         session["summary"] = ""
 
     t0         = time.time()
-    chunks     = retrieve_relevant_chunks(question, top_k=4)
+    chunks     = retrieve_relevant_chunks(question, top_k=8)
     all_meta   = collection.get(include=["metadatas"])["metadatas"]
     sources_map: dict[str, int] = {}
     for m in all_meta:
