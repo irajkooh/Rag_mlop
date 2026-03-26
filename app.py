@@ -3,6 +3,7 @@ app.py — Entry point for HuggingFace Spaces
 Starts FastAPI backend (port 8000) as a subprocess,
 then launches Gradio frontend (port 7860) in the main thread.
 HF Spaces exposes port 7860 by default.
+
 """
 
 import atexit
