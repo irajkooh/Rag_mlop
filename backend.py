@@ -35,12 +35,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s — %(me
 logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BASE_DIR   = Path(__file__).parent
-DATA_DIR   = BASE_DIR / "data"
-LOGS_DIR   = BASE_DIR / "logs"
-CHROMA_DIR = BASE_DIR / "chroma_db"
-for _d in [DATA_DIR, LOGS_DIR, CHROMA_DIR]:
-    _d.mkdir(exist_ok=True)
+BASE_DIR     = Path(__file__).parent
 
 # ── Environment ────────────────────────────────────────────────────────────────
 OLLAMA_URL   = os.getenv("OLLAMA_URL",   "http://localhost:11434")
@@ -48,6 +43,23 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL    = os.getenv("GROQ_MODEL",   "llama-3.1-8b-instant")
 IS_HF_SPACE  = bool(os.getenv("SPACE_ID", ""))
+
+# On HF Space use the persistent /data volume so files survive restarts/redeploys.
+# Locally keep everything relative to the project directory (unchanged behaviour).
+if IS_HF_SPACE:
+    _storage = Path("/data/rag")
+    DATA_DIR   = _storage / "data"
+    LOGS_DIR   = _storage / "logs"
+    CHROMA_DIR = _storage / "chroma_db"
+else:
+    DATA_DIR   = BASE_DIR / "data"
+    LOGS_DIR   = BASE_DIR / "logs"
+    CHROMA_DIR = BASE_DIR / "chroma_db"
+
+URLS_FILE = DATA_DIR / "indexed_urls.txt"   # persists URLs for re-index on startup
+
+for _d in [DATA_DIR, LOGS_DIR, CHROMA_DIR]:
+    _d.mkdir(exist_ok=True, parents=True)
 
 logger.info(f"GROQ_API_KEY set: {bool(GROQ_API_KEY)} | model: {GROQ_MODEL} | HF Space: {IS_HF_SPACE}")
 
@@ -290,7 +302,28 @@ def index_url(url: str) -> int:
     metadatas   = [{"source": source_name, "chunk_index": i, "url": url} for i in range(len(chunks))]
     collection.upsert(ids=ids, documents=chunks, embeddings=embeddings, metadatas=metadatas)
     logger.info(f"ChromaDB <- {len(chunks)} chunks from {url}")
+    _save_url(url)
     return len(chunks)
+
+
+def _save_url(url: str):
+    """Append URL to the persistence file if not already there."""
+    existing = set(URLS_FILE.read_text().splitlines()) if URLS_FILE.exists() else set()
+    if url not in existing:
+        with URLS_FILE.open("a") as f:
+            f.write(url + "\n")
+
+
+def _reindex_urls():
+    """Re-index all saved URLs into ChromaDB. Called at startup."""
+    if not URLS_FILE.exists():
+        return
+    urls = [u.strip() for u in URLS_FILE.read_text().splitlines() if u.strip()]
+    for url in urls:
+        try:
+            index_url(url)
+        except Exception as e:
+            logger.warning(f"Could not re-index {url}: {e}")
 
 
 def build_knowledge_base() -> int:
@@ -442,7 +475,11 @@ def log_prediction(session_id, question, answer, chunks, latency_ms):
 
 @app.on_event("startup")
 def startup():
-    logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks already indexed")
+    n_pdf = build_knowledge_base()
+    if n_pdf:
+        logger.info(f"Re-indexed {n_pdf} chunks from PDFs")
+    _reindex_urls()
+    logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
 
