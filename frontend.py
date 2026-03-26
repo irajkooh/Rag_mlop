@@ -693,10 +693,12 @@ def build_ui() -> gr.Blocks:
                     with gr.Column(scale=2, min_width=120):
                         with gr.Column(elem_classes="btn-send"):
                             send_btn = gr.Button("Send ➤", variant="primary")
-                        with gr.Column(elem_classes="btn-danger"):
-                            stop_btn = gr.Button("⏹ Stop")
-                        with gr.Column(elem_classes="btn-read"):
-                            read_btn = gr.Button("🔊 Read Last")
+
+                with gr.Row():
+                    with gr.Column(scale=1, elem_classes="btn-danger"):
+                        stop_btn = gr.Button("⏹ Stop")
+                    with gr.Column(scale=1, elem_classes="btn-read"):
+                        read_btn = gr.Button("🔊 Read Last")
 
                 gr.HTML("<hr class='divider'>")
 
