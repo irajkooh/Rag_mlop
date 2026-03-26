@@ -83,7 +83,7 @@ git push origin main
 
 Add GitHub secret:
 
-| Secret name | Value                          |
+| Secret name | Value                         |
 |-------------|-------------------------------|
 | `HF_TOKEN`  | Your HuggingFace write token  |
 

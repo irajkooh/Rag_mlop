@@ -114,7 +114,12 @@ def upload_url_to_backend(url: str) -> str:
 def get_file_list() -> list:
     try:
         r = requests.get(f"{BACKEND_URL}/kb/status", timeout=10)
-        return list(r.json().get("files", {}).keys())
+        d = r.json()
+        files = list(d.get("files", {}).keys())
+        urls = d.get("urls", {})
+        url_entries = [url for url in urls.keys()]
+        # Show PDFs and URLs (with full URLs)
+        return files + url_entries
     except Exception:
         return []
 
@@ -133,14 +138,14 @@ def delete_selected(selected: list):
     if not selected:
         return "⚠️  No files selected.", gr.update(), get_kb_status()
     results = []
-    for fname in selected:
+    for identifier in selected:
         try:
-            r = requests.delete(f"{BACKEND_URL}/files/{fname}", timeout=30)
+            r = requests.delete(f"{BACKEND_URL}/files/{identifier}", timeout=30)
             r.raise_for_status()
             d = r.json()
-            results.append(f"✅ Removed {fname}  ({d['chunks_removed']} chunks)")
+            results.append(f"✅ Removed {identifier}  ({d['chunks_removed']} chunks)")
         except Exception as e:
-            results.append(f"❌ {fname}: {e}")
+            results.append(f"❌ {identifier}: {e}")
     files = get_file_list()
     return "\n".join(results), gr.update(choices=files, value=[]), get_kb_status()
 
@@ -160,10 +165,16 @@ def get_kb_status() -> str:
         r = requests.get(f"{BACKEND_URL}/kb/status", timeout=10)
         d = r.json()
         if d["total_chunks"] == 0:
-            return "📂  No documents indexed yet.\n    Upload a PDF to get started."
-        lines = [f"📚  {d['total_chunks']} total chunks across {len(d['files'])} file(s)\n"]
-        for fname, count in sorted(d["files"].items()):
-            lines.append(f"  • {fname}  ({count} chunks)")
+            return "📂  No documents indexed yet.\n    Upload a PDF or add a URL to get started."
+        lines = [f"📚  {d['total_chunks']} total chunks across {len(d.get('files',{})) + len(d.get('urls',{}))} items\n"]
+        if d.get("files"):
+            lines.append("PDFs:")
+            for fname, count in sorted(d["files"].items()):
+                lines.append(f"  • {fname}  ({count} chunks)")
+        if d.get("urls"):
+            lines.append("URLs:")
+            for url, meta in d["urls"].items():
+                lines.append(f"  • {url}  ({meta['count']} chunks)")
         return "\n".join(lines)
     except Exception as e:
         return f"⚠️  Cannot reach backend: {e}"
@@ -929,7 +940,7 @@ def build_ui() -> gr.Blocks:
                                 url_btn = gr.Button("🌐 Add URL", variant="primary")
 
                         gr.HTML("<hr class='divider'>")
-                        gr.HTML("<p style='font-family:monospace;font-size:11px;color:#6b7d96;margin-bottom:4px;'>🗂️ Select files to delete</p>")
+                        gr.HTML("<p style='font-family:monospace;font-size:11px;color:#6b7d96;margin-bottom:4px;'>🗂️ Select PDFs or URLs to delete<br><span style='color:#aaa;font-size:10px;'>(URLs shown as full links, including http/https)</span></p>")
 
                         file_selector = gr.CheckboxGroup(
                             label="",
@@ -959,7 +970,7 @@ def build_ui() -> gr.Blocks:
                         )
                         kb_status_out = gr.Textbox(
                             label="",
-                            lines=11,
+                            lines=14,
                             interactive=False,
                             value=get_kb_status(),
                             elem_classes="copy-box",

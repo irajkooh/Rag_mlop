@@ -466,11 +466,24 @@ def system_info():
 @app.get("/kb/status")
 def kb_status():
     all_meta = collection.get(include=["metadatas"])["metadatas"]
-    sources: dict[str, int] = {}
+    files: dict[str, int] = {}
+    urls: dict[str, dict] = {}
     for m in all_meta:
         s = m.get("source", "unknown")
-        sources[s] = sources.get(s, 0) + 1
-    return {"total_chunks": collection.count(), "files": sources}
+        url = m.get("url")
+        if url:
+            # It's a web doc
+            if url not in urls:
+                urls[url] = {"source": s, "count": 0}
+            urls[url]["count"] += 1
+        else:
+            # It's a PDF
+            files[s] = files.get(s, 0) + 1
+    return {
+        "total_chunks": collection.count(),
+        "files": files,         # PDFs by filename
+        "urls": urls           # URLs by full URL
+    }
 
 
 @app.post("/upload")
@@ -507,13 +520,19 @@ def reload_kb():
     return {"message": "Reloaded", "indexed": n, "total_chunks": collection.count()}
 
 
-@app.delete("/files/{filename:path}")
-def delete_file(filename: str):
-    ids = collection.get(where={"source": filename})["ids"]
+
+# Delete by filename (PDF) or by full URL (web doc)
+@app.delete("/files/{identifier:path}")
+def delete_file(identifier: str):
+    # Try as PDF filename first
+    ids = collection.get(where={"source": identifier})["ids"]
+    if not ids:
+        # Try as full URL (for web docs)
+        ids = collection.get(where={"url": identifier})["ids"]
     if ids:
         collection.delete(ids=ids)
-    logger.info(f"Removed {filename} from vectorstore ({len(ids)} chunks)")
-    return {"message": f"Removed {filename} from index", "chunks_removed": len(ids), "total_chunks": collection.count()}
+    logger.info(f"Removed {identifier} from vectorstore ({len(ids)} chunks)")
+    return {"message": f"Removed {identifier} from index", "chunks_removed": len(ids), "total_chunks": collection.count()}
 
 
 @app.delete("/files")
