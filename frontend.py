@@ -620,6 +620,7 @@ button.secondary:hover, .btn-action button:hover {
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(css=CSS, title="RAG Knowledge Assistant", theme=gr.themes.Base()) as demo:
+        demo.queue()  # required for cancel support
 
         # ── Shared state ───────────────────────────────────────────────────
         session_id  = gr.State(str(uuid.uuid4()))
