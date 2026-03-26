@@ -22,9 +22,11 @@ import re
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
-# Prevent concurrent chat: second click is silently discarded while one is running.
-# Resets in the finally block so Stop (which triggers GeneratorExit) also resets it.
+# _chat_busy  — prevents concurrent sends (second click is a no-op)
+# _chat_gen   — incremented by Stop; on_send checks it before yielding the answer
+#               so a stale result from a cancelled backend call is never shown
 _chat_busy = False
+_chat_gen  = 0
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -748,32 +750,29 @@ def build_ui() -> gr.Blocks:
 
                 # ── Event wiring ─────────────────────────────────────────
                 async def on_send(msg, hist, sid):
-                    global _chat_busy
+                    global _chat_busy, _chat_gen
                     if not msg.strip():
                         yield hist, sid, gr.update(value=msg, interactive=True), "", hist
                         return
                     if _chat_busy:
-                        # Truly touch nothing — gr.update() with no args = no change
                         yield gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
                         return
                     _chat_busy = True
+                    my_gen = _chat_gen          # snapshot generation at call time
                     try:
-                        # Don't add user question to chatbot until the answer is ready.
-                        # This prevents an orphaned unanswered entry if another click fires.
                         yield hist, sid, gr.update(value="Thinking…", interactive=False), "", hist
                         await asyncio.sleep(0)  # flush "Thinking…" before blocking
                         loop = asyncio.get_event_loop()
                         new_hist, new_sid, _, plain = await loop.run_in_executor(
                             None, lambda: chat(msg, hist, sid)
                         )
-                        # Question + answer appear together in one update
-                        yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
-                    except asyncio.CancelledError:
-                        # Catch cancellation and yield a clean final state so the
-                        # generator exits normally — prevents "Connection errored out"
-                        yield hist, sid, gr.update(value="", interactive=True), "", hist
+                        # Only show result if Stop wasn't clicked while we were waiting
+                        if my_gen == _chat_gen:
+                            yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
                     finally:
-                        _chat_busy = False
+                        # Only reset busy flag if this is still the current generation
+                        if my_gen == _chat_gen:
+                            _chat_busy = False
 
                 _SCROLL_JS = """() => {
                     const c = document.querySelector('#chatbot');
@@ -815,20 +814,13 @@ def build_ui() -> gr.Blocks:
                     sq_ev.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                     sq_events.append(sq_ev)
 
-                # Two separate click events on stop_btn:
-                # 1. Cancel ALL running chat generators.
-                # fn=None raises IndexError in Gradio's queue on HF Space;
-                # use a no-arg no-op lambda instead (accepts *_ for session_hash override).
-                stop_btn.click(
-                    fn=lambda *_: None,
-                    inputs=[],
-                    outputs=[],
-                    cancels=[send_event, submit_event] + sq_events,
-                )
-                # 2. Restore chatbot from snapshot + reset textbox + fresh session_id.
-                #    Fresh session_id abandons the backend session that may have received
-                #    the cancelled question (the executor thread runs on after cancel).
+                # Stop: increment _chat_gen so any in-flight on_send skips its final yield.
+                # No cancels= — avoids the "Connection errored out" SSE error Gradio sends
+                # when it cancels an async generator mid-flight.
                 def on_stop_cleanup(hist):
+                    global _chat_busy, _chat_gen
+                    _chat_gen += 1      # invalidate any running on_send
+                    _chat_busy = False  # allow the next question immediately
                     return hist, gr.update(value="", interactive=True), str(uuid.uuid4())
 
                 stop_btn.click(
