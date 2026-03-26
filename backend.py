@@ -303,21 +303,36 @@ def _index_single_url(url: str) -> int:
 
 
 def _extract_links(html: str, base_url: str) -> list[str]:
-    """Return same-domain absolute links found in html."""
+    """Return same-domain absolute links found in html using the stdlib HTML parser."""
     from urllib.parse import urlparse, urljoin
-    import re
+    from html.parser import HTMLParser
+
+    class _LinkParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.hrefs: list[str] = []
+        def handle_starttag(self, tag, attrs):
+            if tag == "a":
+                for name, val in attrs:
+                    if name == "href" and val and not val.startswith(("#", "javascript:", "mailto:")):
+                        self.hrefs.append(val)
+
+    parser = _LinkParser()
+    parser.feed(html)
+
     parsed_base = urlparse(base_url)
     base_domain = parsed_base.netloc
-    hrefs = re.findall(r'href=["\']([^"\'#?][^"\']*)["\']', html)
-    links = []
-    for href in hrefs:
+    seen: set[str] = set()
+    links: list[str] = []
+    for href in parser.hrefs:
         abs_url = urljoin(base_url, href)
         p = urlparse(abs_url)
         if p.netloc == base_domain and p.scheme in ("http", "https"):
-            clean = p.scheme + "://" + p.netloc + p.path
-            if clean not in links:
+            clean = p.scheme + "://" + p.netloc + p.path.rstrip("/")
+            if clean not in seen and clean != base_url.rstrip("/"):
+                seen.add(clean)
                 links.append(clean)
-    return links[:20]   # cap at 20 child links per page
+    return links[:30]   # cap at 30 child links per page
 
 
 def index_url(url: str, depth: int = 2) -> int:
