@@ -571,6 +571,12 @@ def ask(req: QuestionRequest):
         sessions[session_id] = {"history": [], "summary": ""}
     session = sessions[session_id]
 
+    # Space: if ChromaDB is empty, clear any stale session summary so the LLM
+    # cannot read old "4 documents indexed" context from a previous session.
+    if IS_HF_SPACE and collection.count() == 0:
+        session["history"] = []
+        session["summary"] = ""
+
     t0         = time.time()
     chunks     = retrieve_relevant_chunks(question, top_k=4)
     all_meta   = collection.get(include=["metadatas"])["metadatas"]

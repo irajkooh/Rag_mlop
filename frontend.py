@@ -1043,23 +1043,39 @@ def build_ui() -> gr.Blocks:
                     outputs=[upload_status, file_selector, kb_status_out, confirm_row, delete_sel_btn, delete_all_btn],
                 )
 
-        # Space-only: wipe all docs whenever a browser session (re)loads the page.
-        # Handles the case where the Space container slept but didn't restart —
-        # EphemeralClient keeps data in memory across sleep/wake cycles.
+        # Space-only: on every page load wipe ALL docs AND reset the entire UI.
+        # Covers both full restart and sleep/wake reconnect scenarios.
         if IS_HF_SPACE:
             def _wipe_on_load():
                 try:
                     requests.delete(f"{BACKEND_URL}/files", timeout=30)
                 except Exception:
                     pass
+                try:
+                    requests.post(f"{BACKEND_URL}/session/clear",
+                                  json={"session_id": ""}, timeout=10)
+                except Exception:
+                    pass
                 files = get_file_list()
                 s, d = btn_state(files)
-                return "", gr.update(choices=files, value=[]), get_kb_status(), s, d
+                return (
+                    [],                              # chatbot — clear history
+                    str(uuid.uuid4()),               # session_id — fresh session
+                    "",                              # last_answer
+                    [],                              # hist_snapshot
+                    "",                              # upload_status
+                    gr.update(choices=files, value=[]),  # file_selector
+                    get_kb_status(),                 # kb_status_out
+                    s,                               # delete_sel_btn
+                    d,                               # delete_all_btn
+                )
 
             demo.load(
                 _wipe_on_load,
                 inputs=[],
-                outputs=[upload_status, file_selector, kb_status_out, delete_sel_btn, delete_all_btn],
+                outputs=[chatbot, session_id, last_answer, hist_snapshot,
+                         upload_status, file_selector, kb_status_out,
+                         delete_sel_btn, delete_all_btn],
             )
 
         # ── Footer ────────────────────────────────────────────────────────
