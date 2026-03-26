@@ -812,11 +812,13 @@ def build_ui() -> gr.Blocks:
                     sq_events.append(sq_ev)
 
                 # Two separate click events on stop_btn:
-                # 1. Cancel ALL running chat generators
+                # 1. Cancel ALL running chat generators.
+                # fn=None raises IndexError in Gradio's queue on HF Space;
+                # use a no-arg no-op lambda instead (accepts *_ for session_hash override).
                 stop_btn.click(
-                    fn=None,
-                    inputs=None,
-                    outputs=None,
+                    fn=lambda *_: None,
+                    inputs=[],
+                    outputs=[],
                     cancels=[send_event, submit_event] + sq_events,
                 )
                 # 2. Restore chatbot from snapshot + reset textbox + fresh session_id.
