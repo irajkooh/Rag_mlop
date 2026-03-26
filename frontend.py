@@ -779,7 +779,21 @@ def build_ui() -> gr.Blocks:
                 )
                 submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
-                stop_btn.click(fn=None, inputs=[], outputs=[], cancels=[send_event, submit_event])
+                def on_stop(history):
+                    # Remove incomplete exchange (thinking bubble + unanswered user msg)
+                    h = list(history)
+                    if h and "Thinking" in h[-1].get("content", ""):
+                        h.pop()  # remove thinking bubble
+                        if h and h[-1].get("role") == "user":
+                            h.pop()  # remove the unanswered user message
+                    return h
+
+                stop_btn.click(
+                    fn=on_stop,
+                    inputs=[chatbot],
+                    outputs=[chatbot],
+                    cancels=[send_event, submit_event],
+                )
 
                 def make_sq_handler(question):
                     def handler(hist, sid):
