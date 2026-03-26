@@ -94,6 +94,12 @@ def upload_url_to_backend(url: str) -> str:
         r.raise_for_status()
         d = r.json()
         return f"✅ {d['message']}  —  {d['chunks_added']} chunks added  |  total: {d['total_chunks']}"
+    except requests.HTTPError as e:
+        try:
+            detail = e.response.json().get("detail", str(e))
+        except Exception:
+            detail = str(e)
+        return f"❌ {detail}"
     except Exception as e:
         return f"❌ URL indexing failed: {e}"
 
