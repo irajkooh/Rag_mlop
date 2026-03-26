@@ -371,12 +371,12 @@ def answer_question(question: str, chunks: list[dict], summary: str, system_info
         n_files   = len(files)
         file_list = ", ".join(files) if files else "none"
         meta = (
-            f"\nSYSTEM INFO (LIVE — reflects the current state right now; "
-            f"overrides anything in conversation history about file counts or document names):\n"
+            f"\nSYSTEM INFO (AUTHORITATIVE — always use this for questions about file count, "
+            f"document names, or system status; never count from CONTEXT for these):\n"
             f"- You are a RAG-powered document Q&A assistant.\n"
             f"- You can answer questions from uploaded PDF documents using semantic search.\n"
             f"- Exactly {n_files} document(s) are currently indexed ({n_chunks} total chunks).\n"
-            f"- Indexed document names: {file_list if file_list else 'none — no documents indexed yet'}.\n"
+            f"- Indexed document names: {file_list}.\n"
             f"- You can also summarise, compare, and reason over the document contents.\n"
         )
     else:
@@ -385,15 +385,12 @@ def answer_question(question: str, chunks: list[dict], summary: str, system_info
     doc_instruction = (
         "Answer using the CONTEXT section below for questions about document content. "
         "For questions about the system, file count, or document names, "
-        "use SYSTEM INFO — it is live and overrides conversation history; "
-        "do NOT count sources in CONTEXT and do NOT rely on past conversation for current counts. "
+        "use SYSTEM INFO — it is the authoritative source; do NOT count sources in CONTEXT. "
         "If neither contains the answer, respond with: "
         "\"I Don't Know — the answer is not in the provided documents.\" "
     ) if chunks else (
         "No document context is available for this question. "
-        "Use SYSTEM INFO for questions about file count or document names — "
-        "it is live and overrides conversation history. "
-        "Otherwise respond with: "
+        "Answer using SYSTEM INFO if relevant, otherwise respond with: "
         "\"I Don't Know — the answer is not in the provided documents.\" "
     )
 
@@ -449,6 +446,11 @@ def log_prediction(session_id, question, answer, chunks, latency_ms):
 
 @app.on_event("startup")
 def startup():
+    if IS_HF_SPACE:
+        stale = collection.get()["ids"]
+        if stale:
+            collection.delete(ids=stale)
+            logger.info(f"Space startup: cleared {len(stale)} stale chunks")
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
