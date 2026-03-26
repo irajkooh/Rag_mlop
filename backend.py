@@ -99,10 +99,17 @@ if _torch_device in ("mps", "cuda"):
 # 3. ChromaDB — persistent vector store
 # ══════════════════════════════════════════════════════════════════════════════
 
-chroma_client = chromadb.PersistentClient(
-    path=str(CHROMA_DIR),
-    settings=Settings(anonymized_telemetry=False),
-)
+# On HF Space use an in-memory client so every restart starts clean.
+# Locally use PersistentClient so documents survive restarts.
+if IS_HF_SPACE:
+    chroma_client = chromadb.EphemeralClient(
+        settings=Settings(anonymized_telemetry=False),
+    )
+else:
+    chroma_client = chromadb.PersistentClient(
+        path=str(CHROMA_DIR),
+        settings=Settings(anonymized_telemetry=False),
+    )
 
 collection = chroma_client.get_or_create_collection(
     name="rag_documents",
@@ -446,18 +453,6 @@ def log_prediction(session_id, question, answer, chunks, latency_ms):
 
 @app.on_event("startup")
 def startup():
-    global collection
-    if IS_HF_SPACE:
-        # Always start clean on Space — drop and recreate the collection
-        try:
-            chroma_client.delete_collection("rag_documents")
-            collection = chroma_client.get_or_create_collection(
-                name="rag_documents",
-                metadata={"hnsw:space": "cosine"},
-            )
-            logger.info("Space startup: ChromaDB wiped — starting clean")
-        except Exception as e:
-            logger.warning(f"Space startup wipe failed: {e}")
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
