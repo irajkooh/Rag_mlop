@@ -507,7 +507,7 @@ def reload_kb():
     return {"message": "Reloaded", "indexed": n, "total_chunks": collection.count()}
 
 
-@app.delete("/files/{filename}")
+@app.delete("/files/{filename:path}")
 def delete_file(filename: str):
     ids = collection.get(where={"source": filename})["ids"]
     if ids:
