@@ -18,6 +18,7 @@ import requests
 import uuid
 import os
 import re
+import threading
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
@@ -733,13 +734,26 @@ def build_ui() -> gr.Blocks:
                     if not msg.strip():
                         yield hist, sid, msg, ""
                         return
-                    # Yield a "thinking" state immediately so Stop can cancel cleanly
                     thinking = hist + [{"role": "user", "content": msg},
                                        {"role": "assistant", "content": "⏳ *Thinking…*"}]
                     yield thinking, sid, "", ""
-                    # Now call the backend
-                    new_hist, sid, _, plain = chat(msg, hist, sid)
-                    yield new_hist, sid, "", plain
+
+                    # Run backend call in a thread so we can yield while waiting,
+                    # giving Gradio a cancellation point every 0.5 s
+                    result: list = []
+                    t = threading.Thread(
+                        target=lambda: result.append(chat(msg, hist, sid)),
+                        daemon=True,
+                    )
+                    t.start()
+                    while t.is_alive():
+                        t.join(timeout=0.5)
+                        if t.is_alive():
+                            yield thinking, sid, "", ""  # still waiting
+
+                    if result:
+                        new_hist, sid, _, plain = result[0]
+                        yield new_hist, sid, "", plain
 
                 _SCROLL_JS = """() => {
                     const c = document.querySelector('#chatbot');
