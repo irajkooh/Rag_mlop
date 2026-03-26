@@ -496,7 +496,8 @@ def upload_url(req: UrlRequest):
     try:
         n = index_url(url)
         return {"message": f"Indexed {url}", "chunks_added": n, "total_chunks": collection.count()}
-    except ValueError as e:
+    except (ValueError, Exception) as e:
+        logger.error(f"URL indexing error for {url}: {e}")
         raise HTTPException(status_code=422, detail=str(e))
 
 
