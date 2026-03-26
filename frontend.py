@@ -22,6 +22,10 @@ import re
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
+# Prevent concurrent chat: second click is silently discarded while one is running.
+# Resets in the finally block so Stop (which triggers GeneratorExit) also resets it.
+_chat_busy = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Backend helpers
@@ -744,19 +748,27 @@ def build_ui() -> gr.Blocks:
 
                 # ── Event wiring ─────────────────────────────────────────
                 async def on_send(msg, hist, sid):
-                    if not msg.strip():
-                        yield hist, sid, gr.update(value=msg, interactive=True), "", hist
+                    global _chat_busy
+                    if not msg.strip() or _chat_busy:
+                        # No-op: empty message or another chat is already running
+                        yield hist, sid, gr.update(), "", hist
                         return
-                    with_question = hist + [{"role": "user", "content": msg}]
-                    yield with_question, sid, gr.update(value="Thinking…", interactive=False), "", hist
-                    await asyncio.sleep(0)  # flush first yield so "Thinking…" appears before we block
-                    # run_in_executor keeps the event loop free so Stop's /cancel
-                    # request can be received and processed during the backend call
-                    loop = asyncio.get_event_loop()
-                    new_hist, new_sid, _, plain = await loop.run_in_executor(
-                        None, lambda: chat(msg, hist, sid)
-                    )
-                    yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
+                    _chat_busy = True
+                    try:
+                        with_question = hist + [{"role": "user", "content": msg}]
+                        yield with_question, sid, gr.update(value="Thinking…", interactive=False), "", hist
+                        await asyncio.sleep(0)  # flush "Thinking…" to client before blocking
+                        # run_in_executor keeps the event loop free so Stop's /cancel
+                        # request can be received and processed during the backend call
+                        loop = asyncio.get_event_loop()
+                        new_hist, new_sid, _, plain = await loop.run_in_executor(
+                            None, lambda: chat(msg, hist, sid)
+                        )
+                        yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
+                    finally:
+                        # Runs on normal completion AND on generator cancellation (Stop),
+                        # so the flag is always cleared.
+                        _chat_busy = False
 
                 _SCROLL_JS = """() => {
                     const c = document.querySelector('#chatbot');
