@@ -39,7 +39,6 @@ BASE_DIR   = Path(__file__).parent
 DATA_DIR   = BASE_DIR / "data"
 LOGS_DIR   = BASE_DIR / "logs"
 CHROMA_DIR = BASE_DIR / "chroma_db"
-URLS_FILE  = DATA_DIR / "indexed_urls.txt"   # persists URLs for re-index on startup
 
 for _d in [DATA_DIR, LOGS_DIR, CHROMA_DIR]:
     _d.mkdir(exist_ok=True)
@@ -292,28 +291,7 @@ def index_url(url: str) -> int:
     metadatas   = [{"source": source_name, "chunk_index": i, "url": url} for i in range(len(chunks))]
     collection.upsert(ids=ids, documents=chunks, embeddings=embeddings, metadatas=metadatas)
     logger.info(f"ChromaDB <- {len(chunks)} chunks from {url}")
-    _save_url(url)
     return len(chunks)
-
-
-def _save_url(url: str):
-    """Append URL to the persistence file if not already there."""
-    existing = set(URLS_FILE.read_text().splitlines()) if URLS_FILE.exists() else set()
-    if url not in existing:
-        with URLS_FILE.open("a") as f:
-            f.write(url + "\n")
-
-
-def _reindex_urls():
-    """Re-index all saved URLs into ChromaDB. Called at startup."""
-    if not URLS_FILE.exists():
-        return
-    urls = [u.strip() for u in URLS_FILE.read_text().splitlines() if u.strip()]
-    for url in urls:
-        try:
-            index_url(url)
-        except Exception as e:
-            logger.warning(f"Could not re-index {url}: {e}")
 
 
 def build_knowledge_base() -> int:
@@ -465,10 +443,6 @@ def log_prediction(session_id, question, answer, chunks, latency_ms):
 
 @app.on_event("startup")
 def startup():
-    n_pdf = build_knowledge_base()
-    if n_pdf:
-        logger.info(f"Re-indexed {n_pdf} chunks from PDFs")
-    _reindex_urls()
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
