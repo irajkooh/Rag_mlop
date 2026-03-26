@@ -446,11 +446,18 @@ def log_prediction(session_id, question, answer, chunks, latency_ms):
 
 @app.on_event("startup")
 def startup():
+    global collection
     if IS_HF_SPACE:
-        stale = collection.get()["ids"]
-        if stale:
-            collection.delete(ids=stale)
-            logger.info(f"Space startup: cleared {len(stale)} stale chunks")
+        # Always start clean on Space — drop and recreate the collection
+        try:
+            chroma_client.delete_collection("rag_documents")
+            collection = chroma_client.get_or_create_collection(
+                name="rag_documents",
+                metadata={"hnsw:space": "cosine"},
+            )
+            logger.info("Space startup: ChromaDB wiped — starting clean")
+        except Exception as e:
+            logger.warning(f"Space startup wipe failed: {e}")
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
