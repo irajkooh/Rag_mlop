@@ -243,28 +243,49 @@ def index_pdf(pdf_path: Path) -> int:
     return len(chunks)
 
 
+def _is_pdf_url(url: str, resp) -> bool:
+    """Return True if the response is a PDF."""
+    ct = resp.headers.get("Content-Type", "")
+    return "application/pdf" in ct or url.lower().split("?")[0].endswith(".pdf")
+
+
 def fetch_url_chunks(url: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    """Fetch a web page, extract main text, return overlapping chunks."""
+    """Fetch a URL (HTML page or PDF) and return text chunks."""
     import trafilatura
+    import tempfile
 
-    # Try requests with a browser User-Agent first (bypasses basic bot blocks)
-    html = None
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "en-US,en;q=0.9",
+    }
+
+    resp = None
     try:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-        resp = _http.get(url, headers=headers, timeout=20, allow_redirects=True)
-        if resp.status_code == 200:
-            html = resp.text
-    except Exception:
-        pass
+        resp = _http.get(url, headers=headers, timeout=30, allow_redirects=True)
+        resp.raise_for_status()
+    except Exception as e:
+        raise ValueError(f"Could not fetch URL: {e}")
 
-    # Fall back to trafilatura's own fetcher
+    # ── PDF URL ────────────────────────────────────────────────────────────
+    if _is_pdf_url(url, resp):
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(resp.content)
+            tmp_path = Path(tmp.name)
+        try:
+            chunks = extract_chunks(tmp_path, chunk_size=chunk_size, overlap=overlap)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+        if not chunks:
+            raise ValueError(f"No extractable text in PDF at {url}")
+        chunks.append(f"Source URL: {url}")
+        return chunks
+
+    # ── HTML page ─────────────────────────────────────────────────────────
+    html = resp.text
     if not html:
         html = trafilatura.fetch_url(url)
     if not html:
@@ -274,7 +295,10 @@ def fetch_url_chunks(url: str, chunk_size: int = 500, overlap: int = 50) -> list
     if not text:
         text = trafilatura.extract(html, favour_recall=True)
     if not text:
-        raise ValueError(f"No extractable text at this URL (page may require JavaScript or login): {url}")
+        raise ValueError(
+            f"No extractable text at this URL — the page likely requires "
+            f"JavaScript or login. Try a direct PDF link instead."
+        )
     chunks, start = [], 0
     while start < len(text):
         end   = min(start + chunk_size, len(text))
