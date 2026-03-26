@@ -11,7 +11,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install CPU-only torch first (~300 MB vs ~2 GB for CUDA build)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+# Install everything else (skip torch line to avoid re-downloading)
+RUN grep -v '^torch==' requirements.txt > /tmp/req_notorch.txt && \
+    pip install --no-cache-dir -r /tmp/req_notorch.txt
 
 # Pre-bake the embedding model so cold-start is fast
 RUN python -c "from sentence_transformers import SentenceTransformer; \
