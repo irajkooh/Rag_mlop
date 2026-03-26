@@ -600,6 +600,15 @@ button.secondary:hover, .btn-action button:hover {
 }
 .upload-zone:hover { border-color: var(--blue) !important; }
 
+/* ── Thinking state: amber text in question box while disabled ───────── */
+#question-input textarea:disabled,
+#question-input textarea[disabled],
+#question-input textarea:read-only {
+    color: var(--amber) !important;
+    -webkit-text-fill-color: var(--amber) !important;
+    opacity: 1 !important;
+}
+
 /* ── Divider ─────────────────────────────────────────────────────────── */
 .divider { height:1px; background: var(--surface2); margin:4px 0 8px; border:none; }
 
@@ -739,7 +748,8 @@ def build_ui() -> gr.Blocks:
                         yield hist, sid, gr.update(value=msg, interactive=True), "", hist
                         return
                     with_question = hist + [{"role": "user", "content": msg}]
-                    yield with_question, sid, gr.update(value="", interactive=False), "", hist
+                    yield with_question, sid, gr.update(value="Thinking…", interactive=False), "", hist
+                    await asyncio.sleep(0)  # flush first yield so "Thinking…" appears before we block
                     # run_in_executor keeps the event loop free so Stop's /cancel
                     # request can be received and processed during the backend call
                     loop = asyncio.get_event_loop()
@@ -772,35 +782,42 @@ def build_ui() -> gr.Blocks:
                 )
                 submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
-                # Two separate click events on stop_btn:
-                # 1. Cancel the running generator (no fn — avoids Gradio input-override bug)
-                stop_btn.click(
-                    fn=None,
-                    inputs=None,
-                    outputs=None,
-                    cancels=[send_event, submit_event],
-                )
-                # 2. Restore chatbot to the snapshot taken just before the question was sent,
-                #    and hide the progress bar. Uses hist_snapshot (not chatbot) as input
-                #    so Gradio's "fn+cancels" input-override bug does NOT apply here.
-                stop_btn.click(
-                    fn=lambda h: (h, gr.update(value="", interactive=True)),
-                    inputs=[hist_snapshot],
-                    outputs=[chatbot, user_input],
-                )
-
                 def make_sq_handler(question):
                     async def handler(hist, sid):
                         async for val in on_send(question, hist, sid):
                             yield val
                     return handler
 
+                sq_events = []
                 for q, btn in sq_btns:
-                    btn.click(
+                    sq_ev = btn.click(
                         make_sq_handler(q),
                         inputs=[chatbot, session_id],
                         outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
-                    ).then(None, inputs=[], outputs=[], js=_SCROLL_JS)
+                        cancels=[send_event, submit_event],
+                    )
+                    sq_ev.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
+                    sq_events.append(sq_ev)
+
+                # Two separate click events on stop_btn:
+                # 1. Cancel ALL running chat generators
+                stop_btn.click(
+                    fn=None,
+                    inputs=None,
+                    outputs=None,
+                    cancels=[send_event, submit_event] + sq_events,
+                )
+                # 2. Restore chatbot from snapshot + reset textbox + fresh session_id.
+                #    Fresh session_id abandons the backend session that may have received
+                #    the cancelled question (the executor thread runs on after cancel).
+                def on_stop_cleanup(hist):
+                    return hist, gr.update(value="", interactive=True), str(uuid.uuid4())
+
+                stop_btn.click(
+                    fn=on_stop_cleanup,
+                    inputs=[hist_snapshot],
+                    outputs=[chatbot, user_input, session_id],
+                )
 
                 clear_btn.click(
                     clear_chat,
