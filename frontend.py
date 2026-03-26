@@ -682,6 +682,8 @@ def build_ui() -> gr.Blocks:
                     with gr.Column(scale=2, min_width=120):
                         with gr.Column(elem_classes="btn-send"):
                             send_btn = gr.Button("Send ➤", variant="primary")
+                        with gr.Column(elem_classes="btn-danger"):
+                            stop_btn = gr.Button("⏹ Stop")
                         with gr.Column(elem_classes="btn-read"):
                             read_btn = gr.Button("🔊 Read Last")
 
@@ -742,16 +744,18 @@ def build_ui() -> gr.Blocks:
                     });
                 }"""
 
-                send_btn.click(
+                send_event = send_btn.click(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer],
                 ).then(None, inputs=[], outputs=[], js=_SCROLL_JS)
-                user_input.submit(
+                submit_event = user_input.submit(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer],
                 ).then(None, inputs=[], outputs=[], js=_SCROLL_JS)
+
+                stop_btn.click(fn=None, inputs=[], outputs=[], cancels=[send_event, submit_event])
 
                 def make_sq_handler(question):
                     def handler(hist, sid):
