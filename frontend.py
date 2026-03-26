@@ -620,7 +620,6 @@ button.secondary:hover, .btn-action button:hover {
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(css=CSS, title="RAG Knowledge Assistant", theme=gr.themes.Base()) as demo:
-        demo.queue()  # required for cancel support
 
         # ── Shared state ───────────────────────────────────────────────────
         session_id  = gr.State(str(uuid.uuid4()))
@@ -749,12 +748,14 @@ def build_ui() -> gr.Blocks:
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer],
-                ).then(None, inputs=[], outputs=[], js=_SCROLL_JS)
+                )
+                send_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                 submit_event = user_input.submit(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer],
-                ).then(None, inputs=[], outputs=[], js=_SCROLL_JS)
+                )
+                submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
                 stop_btn.click(fn=None, inputs=[], outputs=[], cancels=[send_event, submit_event])
 
@@ -981,6 +982,7 @@ def build_ui() -> gr.Blocks:
         </div>
         """)
 
+    demo.queue()
     return demo
 
 
