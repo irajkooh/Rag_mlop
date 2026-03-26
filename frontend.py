@@ -749,25 +749,26 @@ def build_ui() -> gr.Blocks:
                 # ── Event wiring ─────────────────────────────────────────
                 async def on_send(msg, hist, sid):
                     global _chat_busy
-                    if not msg.strip() or _chat_busy:
-                        # No-op: empty message or another chat is already running
-                        yield hist, sid, gr.update(), "", hist
+                    if not msg.strip():
+                        yield hist, sid, gr.update(value=msg, interactive=True), "", hist
+                        return
+                    if _chat_busy:
+                        # Truly touch nothing — gr.update() with no args = no change
+                        yield gr.update(), gr.update(), gr.update(), gr.update(), gr.update()
                         return
                     _chat_busy = True
                     try:
-                        with_question = hist + [{"role": "user", "content": msg}]
-                        yield with_question, sid, gr.update(value="Thinking…", interactive=False), "", hist
-                        await asyncio.sleep(0)  # flush "Thinking…" to client before blocking
-                        # run_in_executor keeps the event loop free so Stop's /cancel
-                        # request can be received and processed during the backend call
+                        # Don't add user question to chatbot until the answer is ready.
+                        # This prevents an orphaned unanswered entry if another click fires.
+                        yield hist, sid, gr.update(value="Thinking…", interactive=False), "", hist
+                        await asyncio.sleep(0)  # flush "Thinking…" before blocking
                         loop = asyncio.get_event_loop()
                         new_hist, new_sid, _, plain = await loop.run_in_executor(
                             None, lambda: chat(msg, hist, sid)
                         )
+                        # Question + answer appear together in one update
                         yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
                     finally:
-                        # Runs on normal completion AND on generator cancellation (Stop),
-                        # so the flag is always cleared.
                         _chat_busy = False
 
                 _SCROLL_JS = """() => {
@@ -781,23 +782,16 @@ def build_ui() -> gr.Blocks:
                     });
                 }"""
 
-                # concurrency_id="chat" + concurrency_limit=1 ensures only ONE chat
-                # event runs at a time across ALL buttons — no more concurrent races.
-                _CHAT_CID = "chat"
-                _CHAT_CL  = 1
-
                 send_event = send_btn.click(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
-                    concurrency_id=_CHAT_CID, concurrency_limit=_CHAT_CL,
                 )
                 send_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                 submit_event = user_input.submit(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
-                    concurrency_id=_CHAT_CID, concurrency_limit=_CHAT_CL,
                 )
                 submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
@@ -813,7 +807,6 @@ def build_ui() -> gr.Blocks:
                         make_sq_handler(q),
                         inputs=[chatbot, session_id],
                         outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
-                        concurrency_id=_CHAT_CID, concurrency_limit=_CHAT_CL,
                     )
                     sq_ev.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                     sq_events.append(sq_ev)
