@@ -779,21 +779,24 @@ def build_ui() -> gr.Blocks:
                 )
                 submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
-                def on_stop(history):
-                    # Remove incomplete exchange (thinking bubble + unanswered user msg)
-                    h = list(history)
-                    if h and "Thinking" in h[-1].get("content", ""):
-                        h.pop()  # remove thinking bubble
-                        if h and h[-1].get("role") == "user":
-                            h.pop()  # remove the unanswered user message
-                    return h
-
+                # Two separate click events on stop_btn:
+                # 1. Cancel the running generator (no fn — avoids Gradio overriding inputs)
                 stop_btn.click(
-                    fn=on_stop,
-                    inputs=[chatbot],
-                    outputs=[chatbot],
+                    fn=None,
+                    inputs=None,
+                    outputs=None,
                     cancels=[send_event, submit_event],
                 )
+                # 2. Clean up the thinking bubble from chatbot
+                def on_stop(history):
+                    h = list(history)
+                    if h and "Thinking" in h[-1].get("content", ""):
+                        h.pop()
+                        if h and h[-1].get("role") == "user":
+                            h.pop()
+                    return h
+
+                stop_btn.click(fn=on_stop, inputs=[chatbot], outputs=[chatbot])
 
                 def make_sq_handler(question):
                     def handler(hist, sid):
