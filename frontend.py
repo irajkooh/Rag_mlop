@@ -231,12 +231,11 @@ def chat(user_message: str, history: list, session_id: str):
     src_md   = ("\n\n📎 *Sources: " + ", ".join(sources) + "*") if sources else ""
     lat_md   = f"\n⏱️ *{latency:.0f} ms*"
 
-    plain    = answer
-    rich     = _inline_copy_btn(plain) + answer + src_md + lat_md
+    content = answer + src_md + lat_md
 
     history.append({"role": "user",      "content": user_message})
-    history.append({"role": "assistant", "content": rich})
-    return history, session_id, "", plain
+    history.append({"role": "assistant", "content": content})
+    return history, session_id, "", answer
 
 
 def clear_chat(session_id: str):
