@@ -769,7 +769,7 @@ def build_ui() -> gr.Blocks:
 
                 def make_sq_handler(question):
                     def handler(hist, sid):
-                        return on_send(question, hist, sid)
+                        yield from on_send(question, hist, sid)
                     return handler
 
                 for q, btn in sq_btns:
