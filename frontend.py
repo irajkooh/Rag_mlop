@@ -769,16 +769,23 @@ def build_ui() -> gr.Blocks:
                     });
                 }"""
 
+                # concurrency_id="chat" + concurrency_limit=1 ensures only ONE chat
+                # event runs at a time across ALL buttons — no more concurrent races.
+                _CHAT_CID = "chat"
+                _CHAT_CL  = 1
+
                 send_event = send_btn.click(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
+                    concurrency_id=_CHAT_CID, concurrency_limit=_CHAT_CL,
                 )
                 send_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                 submit_event = user_input.submit(
                     on_send,
                     inputs=[user_input, chatbot, session_id],
                     outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
+                    concurrency_id=_CHAT_CID, concurrency_limit=_CHAT_CL,
                 )
                 submit_event.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
 
@@ -794,7 +801,7 @@ def build_ui() -> gr.Blocks:
                         make_sq_handler(q),
                         inputs=[chatbot, session_id],
                         outputs=[chatbot, session_id, user_input, last_answer, hist_snapshot],
-                        cancels=[send_event, submit_event],
+                        concurrency_id=_CHAT_CID, concurrency_limit=_CHAT_CL,
                     )
                     sq_ev.then(None, inputs=[], outputs=[], js=_SCROLL_JS)
                     sq_events.append(sq_ev)
