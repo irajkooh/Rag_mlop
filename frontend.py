@@ -768,6 +768,10 @@ def build_ui() -> gr.Blocks:
                         )
                         # Question + answer appear together in one update
                         yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
+                    except asyncio.CancelledError:
+                        # Catch cancellation and yield a clean final state so the
+                        # generator exits normally — prevents "Connection errored out"
+                        yield hist, sid, gr.update(value="", interactive=True), "", hist
                     finally:
                         _chat_busy = False
 
