@@ -57,15 +57,33 @@ export OLLAMA_MODEL=mistral
 1. Go to https://huggingface.co/spaces → **Create new Space**
 2. Name: `rag_mlops`, SDK: **Docker**
 
-### Add secrets to the HF Space
+### Add secrets and variables to the HF Space
 
-Go to: **Space → Settings → Variables and secrets → New secret**
+Go to: **Space → Settings → Variables and secrets**
 
-| Secret name    | Value                   |
-|----------------|-------------------------|
-| `GROQ_API_KEY` | Your Groq API key       |
+**Secrets** (encrypted):
+
+| Secret name    | Value                          |
+|----------------|--------------------------------|
+| `GROQ_API_KEY` | Your Groq API key              |
+| `HF_TOKEN`     | Your HuggingFace write token   |
 
 Get a free Groq key at: https://console.groq.com
+Get HF token at: https://huggingface.co/settings/tokens (write scope)
+
+**Variables** (plain text):
+
+| Variable name      | Value                                    |
+|--------------------|------------------------------------------|
+| `HF_DATASET_REPO`  | e.g. `your-username/my_private_storage`  |
+
+> `HF_DATASET_REPO` enables persistence — indexed documents survive Space restarts/sleeps.
+> Create a **private** HF dataset first: https://huggingface.co/new-dataset
+
+### HF Persistence behavior
+
+- If `HF_DATASET_REPO` is set: on startup the app loads previously indexed chunks from the dataset and shows them in the Upload tab. After each upload or delete, data is saved back to the dataset in the background.
+- If `HF_DATASET_REPO` is **not** set: the Space wipes all documents on every page load (fresh start each visit).
 
 ---
 
@@ -105,14 +123,10 @@ git push origin main   # CI/CD handles the rest
 
 ## ChromaDB — where is it stored?
 
-Locally: `./chroma_db/` folder — persists between runs.
-On HF Space: inside the Docker container — resets on redeploy.
+**Locally:** `./chroma_db/` folder — persists between runs (PersistentClient).
 
-To persist ChromaDB on HF Space, mount a HF Dataset as storage:
-```python
-# In backend.py, change CHROMA_DIR to a mounted dataset path
-CHROMA_DIR = Path("/data/chroma_db")
-```
+**On HF Space:** In-memory only (EphemeralClient) — resets on every cold start.
+Persistence is handled via HF Dataset (see `HF_DATASET_REPO` above).
 
 ---
 
@@ -125,8 +139,11 @@ CHROMA_DIR = Path("/data/chroma_db")
 | `/kb/status`      | GET    | Files and chunk counts in ChromaDB    |
 | `/ask`            | POST   | Ask a question (RAG + memory)         |
 | `/upload`         | POST   | Upload and index a PDF                |
+| `/upload_url`     | POST   | Index a URL (2-level deep crawl)      |
 | `/reload`         | POST   | Re-index all PDFs in /data            |
 | `/session/clear`  | POST   | Clear conversation memory             |
+| `/files/{id}`     | DELETE | Delete a single indexed file          |
+| `/files`          | DELETE | Delete all indexed files              |
 | `/logs/stats`     | GET    | MLOps metrics (IDK rate, latency)     |
 
 ---
@@ -141,9 +158,11 @@ git push origin main
 
 ---
 
-## Add PDFs without redeploying
+## Indexing documents
 
-**Via UI:** Upload tab → drop PDF → Upload & Index
+### Upload PDFs
+
+**Via UI:** Upload tab → drop PDF → indexing starts automatically
 
 **Via API:**
 ```bash
@@ -151,10 +170,32 @@ curl -X POST http://localhost:8000/upload \
   -F "file=@your_document.pdf"
 ```
 
-**Via git** (only needed if you want PDFs baked into the Docker image):
+**Via git** (only if you want PDFs baked into the Docker image):
 ```bash
 cp new_doc.pdf data/
 git add data/new_doc.pdf
 git commit -m "add document"
 git push origin main
 ```
+
+### Index a URL
+
+**Via UI:** Upload tab → paste URL → Index URL button
+
+**Via API:**
+```bash
+curl -X POST http://localhost:8000/upload_url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/page"}'
+```
+
+- Crawls the page and follows links **2 levels deep** (same domain, up to 30 child pages)
+- If the URL points to a **PDF** (by Content-Type or `.pdf` extension), it is downloaded and indexed as a PDF
+- JavaScript-rendered pages (e.g. LinkedIn, SPAs) cannot be scraped — only static HTML is supported
+
+---
+
+## Startup hook (SessionStart)
+
+Configured to clear the screen and free ports 8000 and 7860 on startup.
+Set in `.claude/settings.json` → `hooks.SessionStart`.

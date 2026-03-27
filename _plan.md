@@ -17,19 +17,21 @@ Build a production-ready PDF question-answering system with:
 │                                                         │
 │   app.py  (entry point)                                 │
 │      │                                                  │
-│      ├── Thread 1: FastAPI backend  (port 8000)         │
+│      ├── Subprocess: FastAPI backend  (port 8000)       │
 │      │      backend.py                                  │
 │      │      • PDF extraction (PyMuPDF)                  │
+│      │      • URL crawl (2-level deep, same domain)     │
 │      │      • Embedding (sentence-transformers)         │
-│      │      • Vector search (cosine similarity)         │
-│      │      • LLM answer (Groq LLaMA3)                  │
+│      │      • Vector search (ChromaDB HNSW cosine)      │
+│      │      • LLM answer (Ollama local / Groq fallback) │
 │      │      • Memory + summarization                    │
 │      │      • Prediction logging                        │
+│      │      • HF Dataset persistence (optional)         │
 │      │                                                  │
 │      └── Main: Gradio frontend     (port 7860)          │
 │             frontend.py                                 │
 │             • Chat tab (default)                        │
-│             • Upload tab                                │
+│             • Upload tab (auto-index on file select)    │
 │             • TTS, copy, clear buttons                  │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -38,29 +40,29 @@ Build a production-ready PDF question-answering system with:
 
 ## RAG Pipeline
 
-```
+```text
 User question
      │
      ▼
 Embed question (all-MiniLM-L6-v2)
      │
      ▼
-Cosine similarity vs all chunks
+ChromaDB HNSW cosine search
      │
      ▼
-Top-4 chunks (score > 0.25 threshold)
+Top-8 chunks (score > 0.25 threshold)
      │
      ├── No chunks above threshold? → "I Don't Know"
      │
      ▼
 Build prompt:
   system: "Answer ONLY from CONTEXT"
-  context: top-4 chunks
+  context: top-8 chunks  (with [Source: <url or filename>] labels)
   history: summarized conversation
   question: user question
      │
      ▼
-Groq LLaMA3-8b → answer
+Ollama (local) → fallback to Groq LLaMA3-8b → answer
      │
      ▼
 Log (session_id, question, answer, sources, latency)
@@ -73,7 +75,7 @@ Return to UI + update memory
 
 ## Memory Management
 
-```
+```text
 Turn 1:  Q1 → A1  →  summary_1 = summarize([Q1,A1])
 Turn 2:  Q2 → A2  →  summary_2 = summarize([Q2,A2]) (includes prior summary)
 Turn N:  QN → AN  →  summary_N = summarize([QN,AN])
@@ -86,7 +88,7 @@ This keeps the LLM context window under control regardless of conversation lengt
 
 ## MLOps Loop
 
-```
+```text
 Daily (GitHub Actions cron):
   1. drift_check.py   → fetch /logs/stats
                      → alert if IDK rate > 50%
@@ -105,20 +107,21 @@ On push (GitHub Actions):
 
 ## File Structure
 
-```
+```text
 rag_mlops/
-├── app.py              Entry point (starts backend + frontend)
+├── app.py              Entry point (starts backend subprocess + Gradio)
 ├── backend.py          FastAPI RAG engine
 ├── frontend.py         Gradio UI
 ├── requirements.txt    Python dependencies
 ├── Dockerfile          Container definition
 ├── README.md           HF Space config + description
-├── data/               PDFs go here (persisted in Space)
+├── data/               PDFs go here (pre-baked into image if committed)
+├── chroma_db/          Local vector store (gitignored; rebuilt on upload)
 ├── logs/               Prediction logs (JSONL)
 ├── monitor/
 │   ├── drift_check.py      Daily MLOps drift monitor
 │   └── accuracy_check.py   Daily canary accuracy check
-├── tests/              Unit tests (add yours here)
+├── tests/              Unit tests
 └── .github/
     └── workflows/
         └── deploy.yml  CI/CD pipeline
@@ -128,25 +131,27 @@ rag_mlops/
 
 ## Technology Choices
 
-| Component        | Choice                   | Why                                      |
-|------------------|--------------------------|------------------------------------------|
-| PDF extraction   | PyMuPDF (fitz)           | Fast, accurate, no external service      |
-| Embedding model  | all-MiniLM-L6-v2         | Lightweight, runs on CPU, good quality   |
-| Vector search    | cosine similarity + numpy | No vector DB dependency, simple          |
-| LLM              | Groq LLaMA3-8b           | Fast inference, free tier, no GPU needed |
-| API framework    | FastAPI                  | Async, auto-docs, type-safe              |
-| UI framework     | Gradio 4.x               | Native HF Spaces support                 |
-| CI/CD            | GitHub Actions           | Free, integrated with GitHub             |
-| Monitoring       | Custom JSONL logs        | No external service required             |
+| Component       | Choice              | Why                                      |
+|-----------------|---------------------|------------------------------------------|
+| PDF extraction  | PyMuPDF (fitz)      | Fast, accurate, no external service      |
+| Embedding model | all-MiniLM-L6-v2    | Lightweight, runs on CPU, good quality   |
+| Vector store    | ChromaDB (HNSW)     | Persistent locally, scalable, cosine     |
+| LLM (local)     | Ollama llama3       | No API key, runs on-device               |
+| LLM (cloud)     | Groq LLaMA3-8b      | Fast inference, free tier, HF fallback   |
+| API framework   | FastAPI             | Async, auto-docs, type-safe              |
+| UI framework    | Gradio 4.x          | Native HF Spaces support                 |
+| CI/CD           | GitHub Actions      | Free, integrated with GitHub             |
+| Persistence     | HF Dataset (JSON)   | Survives HF Space restarts/sleeps        |
+| Monitoring      | Custom JSONL logs   | No external service required             |
 
 ---
 
 ## Future Improvements
 
-- [ ] Add ChromaDB or FAISS for larger knowledge bases (>10k chunks)
 - [ ] Add reranking (cross-encoder) for better retrieval quality
 - [ ] Add user feedback buttons (👍 👎) to collect ground truth labels
 - [ ] Use labelled feedback to compute real accuracy metrics
 - [ ] Add Evidently AI for richer drift reports
 - [ ] Add Slack/email alerting to monitor/alerts.py
 - [ ] Add authentication to the Gradio UI
+- [ ] Support JavaScript-rendered pages (Playwright/Selenium)

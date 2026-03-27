@@ -96,14 +96,26 @@ git push
 
 ---
 
-## HF Space environment variables (Secrets)
+## HF Space environment variables
 
 Set these in **[HF Space Settings](https://huggingface.co/spaces/irajkoohi/Rag_mlop/settings)**:
 
-|    Variable   |                       Description                      |
-|---------------|--------------------------------------------------------|
-| `GROQ_API_KEY`| Groq API key — fallback LLM when Ollama is unavailable |
-| `OLLAMA_URL`  | Optional — only if you run Ollama externally           |
+**Secrets** (encrypted):
+
+| Secret name    | Description                                            |
+|----------------|--------------------------------------------------------|
+| `GROQ_API_KEY` | Groq API key — fallback LLM when Ollama is unavailable |
+| `HF_TOKEN`     | HuggingFace write token — needed for dataset persistence |
+
+**Variables** (plain text):
+
+| Variable name     | Description                                              |
+|-------------------|----------------------------------------------------------|
+| `HF_DATASET_REPO` | e.g. `your-username/my_private_storage` — enables persistence |
+| `OLLAMA_URL`      | Optional — only if you run Ollama externally             |
+
+> Without `HF_DATASET_REPO`, all indexed documents are wiped on every page load.
+> With it, data is saved to a private HF dataset and restored on startup.
 
 ---
 

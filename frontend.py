@@ -225,17 +225,20 @@ def build_status_bar_html() -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _inline_copy_btn(plain_text: str) -> str:
-    """Tiny inline HTML copy button injected into each assistant bubble."""
-    escaped = (plain_text
-               .replace("\\", "\\\\")
-               .replace("`", "\\`")
-               .replace("\n", "\\n")
-               .replace("'", "\\'"))
+    """Tiny inline HTML copy button injected into each chat bubble."""
+    # HTML-encode the text for safe use in a data attribute
+    # (avoids all JS string-escaping and markdown-renderer conflicts)
+    encoded = (plain_text
+               .replace("&", "&amp;")
+               .replace('"', "&quot;")
+               .replace("<", "&lt;")
+               .replace(">", "&gt;"))
     return (
-        '<span style="float:right;font-size:10px;color:#4fc3f7;cursor:pointer;'
+        f'<span data-copy="{encoded}" '
+        'style="float:right;font-size:10px;color:#4fc3f7;cursor:pointer;'
         'font-family:monospace;padding:2px 6px;border:1px solid #1565c0;'
         'border-radius:4px;margin-left:8px;user-select:none;" '
-        f'onclick="navigator.clipboard.writeText(`{escaped}`).then('
+        "onclick=\"navigator.clipboard.writeText(this.getAttribute('data-copy')).then("
         "()=>{this.textContent='✓';setTimeout(()=>this.textContent='⧉ copy',1400)})"
         '">⧉ copy</span>'
     )
@@ -465,45 +468,62 @@ button.primary:hover, .btn-send button:hover {
     box-shadow: 0 4px 16px var(--blue-glow) !important;
 }
 
-/* Read Last — same size as Send */
-.btn-read button {
-    height: 40px !important;
-    min-height: 40px !important;
-    width: 100% !important;
+/* Stop — orange */
+button.btn-stop {
+    background: rgba(255,152,0,0.12) !important;
+    color: #ffa726 !important;
+    border: 1px solid rgba(255,152,0,0.4) !important;
+}
+button.btn-stop:hover {
+    background: rgba(255,152,0,0.22) !important;
+    border-color: #ffa726 !important;
 }
 
-/* Action — surface */
-button.secondary, .btn-action button {
-    background: var(--surface2) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--surface3) !important;
-    padding: 9px 14px !important;
-}
-button.secondary:hover, .btn-action button:hover {
-    border-color: var(--blue) !important;
-    color: var(--blue-light) !important;
-}
-
-/* Read — amber */
-.btn-read button {
+/* Read Last — amber */
+button.btn-read {
     background: linear-gradient(135deg, var(--amber), var(--amber-dim)) !important;
     color: #111 !important;
     border: none !important;
     font-weight: 700 !important;
-    padding: 9px 14px !important;
 }
-.btn-read button:hover { filter: brightness(1.1) !important; }
+button.btn-read:hover { filter: brightness(1.1) !important; }
 
-/* Danger — red-tint */
-.btn-danger button {
-    background: var(--surface2) !important;
-    color: var(--red) !important;
-    border: 1px solid var(--surface3) !important;
-    padding: 9px 14px !important;
+/* Copy All — teal */
+button.btn-copy-all {
+    background: rgba(0,188,212,0.12) !important;
+    color: var(--teal) !important;
+    border: 1px solid rgba(0,188,212,0.4) !important;
 }
-.btn-danger button:hover {
+button.btn-copy-all:hover {
+    background: rgba(0,188,212,0.22) !important;
+    border-color: var(--teal) !important;
+}
+
+/* Clear Chat — red */
+button.btn-clear {
+    background: rgba(239,83,80,0.12) !important;
+    color: var(--red) !important;
+    border: 1px solid rgba(239,83,80,0.4) !important;
+}
+button.btn-clear:hover {
+    background: rgba(239,83,80,0.22) !important;
     border-color: var(--red) !important;
-    background: rgba(239,83,80,0.07) !important;
+}
+
+/* Action row — 4 buttons, no wrap, fixed width, tight gap */
+#action-row,
+#action-row > div,
+#action-row > div > div {
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+}
+#action-row button { width: 140px !important; }
+button.btn-read { min-width: 140px !important; }
+
+/* Danger (upload tab delete buttons) */
+button.btn-danger {
+    color: var(--red) !important;
+    border: 1px solid rgba(239,83,80,0.4) !important;
 }
 
 /* Refresh — teal outline */
@@ -648,7 +668,31 @@ button.secondary:hover, .btn-action button:hover {
 # ══════════════════════════════════════════════════════════════════════════════
 
 def build_ui() -> gr.Blocks:
-    with gr.Blocks(css=CSS, title="RAG Knowledge Assistant", theme=gr.themes.Base()) as demo:
+    _COPY_BTN_JS = """() => {
+        function injectCopyBtns() {
+            document.querySelectorAll('[data-testid="user"], [data-testid="bot"]').forEach(function(el) {
+                if (el.querySelector('.msg-copy-btn')) return;
+                var btn = document.createElement('span');
+                btn.className = 'msg-copy-btn';
+                btn.innerText = '⧉ copy';
+                btn.style.cssText = 'float:right;font-size:10px;color:#4fc3f7;cursor:pointer;font-family:monospace;padding:2px 6px;border:1px solid #1565c0;border-radius:4px;margin-left:8px;user-select:none;display:inline-block;';
+                btn.addEventListener('click', function() {
+                    var clone = el.cloneNode(true);
+                    clone.querySelectorAll('.msg-copy-btn').forEach(function(e) { e.remove(); });
+                    navigator.clipboard.writeText((clone.innerText || '').trim()).then(function() {
+                        btn.innerText = '✓';
+                        setTimeout(function() { btn.innerText = '⧉ copy'; }, 1400);
+                    });
+                });
+                el.insertBefore(btn, el.firstChild);
+            });
+        }
+        var observer = new MutationObserver(function() { injectCopyBtns(); });
+        observer.observe(document.body, { childList: true, subtree: true });
+        injectCopyBtns();
+    }"""
+
+    with gr.Blocks(css=CSS, title="RAG Knowledge Assistant", theme=gr.themes.Base(), js=_COPY_BTN_JS) as demo:
 
         # ── Shared state ───────────────────────────────────────────────────
         session_id    = gr.State(str(uuid.uuid4()))
@@ -661,18 +705,10 @@ def build_ui() -> gr.Blocks:
         status_html = gr.HTML(value=build_status_bar_html())
 
         with gr.Row(equal_height=True):
-            gr.HTML("")          # spacer
+            gr.HTML("""<p style="margin:4px 0;font-size:12px;font-style:italic;color:var(--muted);">
+                Answers strictly from your uploaded PDFs · ChromaDB · Ollama / Groq</p>""")
             with gr.Column(scale=0, min_width=110, elem_classes="btn-refresh"):
                 refresh_status_btn = gr.Button("🔄 Refresh Status")
-
-        # ── Header ────────────────────────────────────────────────────────
-        gr.HTML("""
-        <div class="rag-header">
-            <h1>⚡ RAG Knowledge Assistant</h1>
-            <p>Answers strictly from your uploaded PDFs · ChromaDB · Ollama / Groq</p>
-            <span class="badge">CHROMADB · OLLAMA · SENTENCE-TRANSFORMERS · FASTAPI · GRADIO</span>
-        </div>
-        """)
 
         refresh_status_btn.click(
             fn=build_status_bar_html,
@@ -694,7 +730,7 @@ def build_ui() -> gr.Blocks:
                     height=490,
                     show_label=False,
                     bubble_full_width=False,
-                    avatar_images=(None, "🤖"),
+                    avatar_images=(None, None),
                     render_markdown=True,
                     sanitize_html=False,
                     elem_id="chatbot",
@@ -714,11 +750,11 @@ def build_ui() -> gr.Blocks:
                         with gr.Column(elem_classes="btn-send"):
                             send_btn = gr.Button("Send ➤", variant="primary")
 
-                with gr.Row():
-                    with gr.Column(scale=1, elem_classes="btn-danger"):
-                        stop_btn = gr.Button("⏹ Stop")
-                    with gr.Column(scale=1, elem_classes="btn-read"):
-                        read_btn = gr.Button("🔊 Read Last")
+                with gr.Row(elem_id="action-row"):
+                    stop_btn     = gr.Button("⏹ Stop",         elem_classes="btn-stop")
+                    read_btn     = gr.Button("🔊 Read Last",    elem_classes="btn-read")
+                    copy_all_btn = gr.Button("📋 Copy All",     elem_classes="btn-copy-all")
+                    clear_btn    = gr.Button("🗑️ Clear Chat",  elem_classes="btn-clear")
 
                 gr.HTML("<hr class='divider'>")
 
@@ -740,15 +776,6 @@ def build_ui() -> gr.Blocks:
                         for q in row_qs:
                             with gr.Column(scale=1, elem_classes="sample-q"):
                                 sq_btns.append((q, gr.Button(q)))
-
-                gr.HTML("<hr class='divider'>")
-
-                # Action row
-                with gr.Row():
-                    with gr.Column(scale=1, elem_classes="btn-danger"):
-                        clear_btn = gr.Button("🗑️ Clear Chat")
-                    with gr.Column(scale=1, elem_classes="btn-action btn-copy-all"):
-                        copy_all_btn = gr.Button("📋 Copy All")
 
                 gr.HTML("""
                 <div class="info-panel" style="margin-top:10px;">
@@ -860,10 +887,12 @@ def build_ui() -> gr.Blocks:
                         let text = '';
                         allMsgs.forEach(el => {
                             const isUser = el.dataset.testid === 'user' || el.classList.contains('user');
-                            text += (isUser ? 'You: ' : 'Assistant: ') + (el.innerText || '').trim() + '\\n\\n';
+                            const clone = el.cloneNode(true);
+                            clone.querySelectorAll('span[onclick], button, .msg-copy-btn').forEach(e => e.remove());
+                            text += (isUser ? 'You: ' : 'Assistant: ') + (clone.innerText || '').trim() + '\\n\\n';
                         });
                         navigator.clipboard.writeText(text.trim()).then(() => {
-                            const btn = document.querySelector('.btn-copy-all button');
+                            const btn = document.querySelector('button.btn-copy-all');
                             if (btn) { const orig = btn.textContent; btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = orig, 1500); }
                         });
                     }""",
@@ -873,7 +902,7 @@ def build_ui() -> gr.Blocks:
                 read_btn.click(
                     None, inputs=[], outputs=[],
                     js="""() => {
-                        const btn = document.querySelector('.btn-read button');
+                        const btn = document.querySelector('button.btn-read');
                         if (window.speechSynthesis.speaking) {
                             window.speechSynthesis.cancel();
                             if (btn) btn.textContent = '🔊 Read Last';
@@ -885,7 +914,7 @@ def build_ui() -> gr.Blocks:
                         if (!nodes.length) return;
                         const last = nodes[nodes.length - 1];
                         const clone = last.cloneNode(true);
-                        clone.querySelectorAll('span[onclick], button').forEach(el => el.remove());
+                        clone.querySelectorAll('span[onclick], button, .msg-copy-btn').forEach(el => el.remove());
                         const text = (clone.innerText || '').replace(/[*_`#>~|]/g,'').replace(/\\n/g,' ').trim();
                         if (!text) return;
                         const u = new SpeechSynthesisUtterance(text);

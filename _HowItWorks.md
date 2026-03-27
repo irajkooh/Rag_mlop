@@ -11,13 +11,17 @@
 ## app.py — Entry Point
 
 ```python
-t = threading.Thread(target=run_backend, daemon=True)
-t.start()
+backend_proc = subprocess.Popen(
+    [sys.executable, "-m", "uvicorn", "backend:app",
+     "--host", "0.0.0.0", "--port", "8000", "--log-level", "warning"],
+)
+wait_for_backend(8000)      # polls /system/info until it responds
 ui = build_ui()
-ui.launch(server_name="0.0.0.0", server_port=7860)
+ui.queue().launch(server_name="0.0.0.0", server_port=7860)
 ```
 
-HuggingFace Spaces expose one port (7860). We need both FastAPI (8000) and Gradio (7860) in the same container. FastAPI runs in a **daemon thread** (dies when main thread exits), Gradio runs in the main thread and blocks, keeping the process alive.
+HuggingFace Spaces expose one port (7860). We need both FastAPI (8000) and Gradio (7860) in the same container.
+FastAPI runs as a **subprocess** (avoids asyncio event-loop conflicts with Gradio), Gradio runs in the main thread and blocks. The subprocess is registered with `atexit.register(backend_proc.terminate)` so it is cleaned up on exit.
 
 ---
 
@@ -40,21 +44,22 @@ Checked once at startup. The result is stored in `DEVICE` and:
 
 On your Mac with Apple Silicon, this returns `"mps"` — the embedding model then runs on the GPU cores of the M-chip, significantly faster than CPU.
 
-### ChromaDB — Persistent Vector Store
+### ChromaDB — Vector Store
 
 ```python
-chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+if IS_HF_SPACE:
+    chroma_client = chromadb.EphemeralClient(settings=Settings(anonymized_telemetry=False))
+else:
+    chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR), settings=Settings(...))
 collection = chroma_client.get_or_create_collection(
     name="rag_documents",
     metadata={"hnsw:space": "cosine"},
 )
 ```
 
-ChromaDB stores vectors to disk (`./chroma_db/`). Unlike the previous in-memory numpy approach:
-- Data **survives restarts** — you don't re-index PDFs every time the app starts
-- Scales to hundreds of thousands of chunks without fitting in RAM
-- Uses HNSW (Hierarchical Navigable Small World) index for fast approximate nearest-neighbour search
-- `hnsw:space: cosine` tells ChromaDB to use cosine distance (0 = identical, 2 = opposite)
+**Locally:** PersistentClient writes to `./chroma_db/` — data survives restarts, no re-indexing needed.
+
+**On HF Space:** EphemeralClient keeps everything in memory. Persistence is handled via HF Dataset (see HF Persistence section below).
 
 ### PDF → Chunks → ChromaDB
 
@@ -67,21 +72,21 @@ def index_pdf(pdf_path):
     collection.upsert(ids=ids, documents=chunks, embeddings=embeddings, metadatas=...)
 ```
 
-`upsert` (update + insert) is idempotent — calling it twice on the same PDF replaces the old chunks rather than duplicating them. The IDs are deterministic (`filename::chunk_index`), so re-uploading the same PDF is safe.
+`upsert` is idempotent — IDs are deterministic (`filename::chunk_index`), so re-uploading the same file is safe.
 
 ### Retrieval from ChromaDB
 
 ```python
 results = collection.query(
     query_embeddings=q_emb,
-    n_results=top_k,
+    n_results=top_k,          # top_k = 8
     include=["documents", "metadatas", "distances"],
 )
 # Convert distance to similarity
 score = 1.0 - (dist / 2.0)
 ```
 
-ChromaDB returns distances (lower = more similar). We convert to similarity scores (higher = more similar) and filter out anything below 0.25. This threshold prevents the LLM from receiving loosely-related noise as context.
+ChromaDB returns distances (lower = more similar). We convert to similarity scores (higher = more similar) and filter out anything below 0.25. `top_k=8` is used to cast a wider net, especially useful for URL-indexed content spread across many small chunks.
 
 ### Ollama LLM — Local Inference
 
@@ -182,12 +187,12 @@ Runs in the browser via Gradio's `js=` parameter — no Python code executes. Th
 3. frontend: POST /ask {question, session_id}
 4. backend: retrieve_relevant_chunks(question)
        → embed question (MPS/CPU)
-       → ChromaDB HNSW search → top-4 chunks
+       → ChromaDB HNSW search → top-8 chunks
        → filter score < 0.25
 5. backend: answer_question(question, chunks, summary)
        → if no chunks: return "I Don't Know" immediately (no LLM call)
-       → else: build prompt → call_llm()
-              → try Ollama (local) → fallback to Groq (cloud)
+       → else: build prompt with source labels (URL or filename)
+              → call_llm(): try Ollama (local) → fallback to Groq (cloud)
 6. backend: update session["history"]
 7. backend: summarize_history() → compress to ≤200 tokens
 8. backend: log_prediction() → append to predictions.jsonl
@@ -314,3 +319,60 @@ status bar will show "Groq" on the next refresh.
 
 The frontend calls this endpoint once at startup to build the HTML pill bar,
 and again whenever the user clicks **🔄 Refresh Status**.
+
+---
+
+## URL Indexing — 2-Level Deep Crawl
+
+```python
+def index_url(url, depth=2):
+    _index_single_url(url)           # index the root page
+    if depth > 1:
+        links = _extract_links(url)  # parse <a href> with html.parser
+        for link in links[:30]:      # up to 30 same-domain child pages
+            _index_single_url(link)
+```
+
+- Fetches static HTML with `urllib` + `User-Agent` header
+- Follows links one level deeper (same domain only, max 30 pages)
+- If the URL points to a **PDF** (detected via `Content-Type: application/pdf` or `.pdf` extension), it downloads the file to a temp path and indexes it through the standard PDF pipeline
+- JavaScript-rendered pages (SPAs, LinkedIn, etc.) cannot be scraped — only static HTML is supported
+
+Each URL chunk is stored with `source` (domain) and `url` (full URL) metadata. When answering, the full URL appears as the source label in the response.
+
+---
+
+## HF Dataset Persistence
+
+On HF Space, ChromaDB is in-memory and resets on every cold start. To survive restarts:
+
+```python
+# On startup: load previously indexed data
+@app.on_event("startup")
+def startup():
+    load_from_hf_dataset()   # downloads chromadb_data.json from HF dataset, upserts chunks
+
+# After every upload / delete: save state in background
+def _save_bg():
+    threading.Thread(target=save_to_hf_dataset, daemon=True).start()
+```
+
+`save_to_hf_dataset()` serializes all ChromaDB documents + embeddings + metadata to JSON and uploads to the private HF dataset repo specified by `HF_DATASET_REPO`.
+
+Requires two Space settings:
+- **Secret** `HF_TOKEN` — HuggingFace write token
+- **Variable** `HF_DATASET_REPO` — e.g. `your-username/my_private_storage`
+
+If `HF_DATASET_REPO` is not set, the Space falls back to wipe-on-load behavior (demo.load() clears docs on every page visit).
+
+---
+
+## Auto-Upload on File Select
+
+Files are indexed as soon as they are selected in the UI — no separate button click needed.
+
+```python
+pdf_upload.change(handle_upload, inputs=[pdf_upload, session_id], outputs=[...])
+```
+
+`pdf_upload.change()` fires whenever the file picker value changes (i.e. immediately after selection). The old "Upload & Index" button has been removed.
