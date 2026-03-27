@@ -241,7 +241,14 @@ def index_pdf(pdf_path: Path) -> int:
     embeddings = embedder.encode(chunks, show_progress_bar=False).tolist()
     ids        = [f"{fname}::{i}" for i in range(len(chunks))]
     metadatas  = [{"source": fname, "chunk_index": i} for i in range(len(chunks))]
-    collection.upsert(ids=ids, documents=chunks, embeddings=embeddings, metadatas=metadatas)
+    batch = 5000
+    for i in range(0, len(chunks), batch):
+        collection.upsert(
+            ids=ids[i:i+batch],
+            documents=chunks[i:i+batch],
+            embeddings=embeddings[i:i+batch],
+            metadatas=metadatas[i:i+batch],
+        )
     logger.info(f"ChromaDB <- {len(chunks)} chunks from {fname}")
     return len(chunks)
 
