@@ -711,8 +711,9 @@ def delete_file(identifier: str):
 @app.delete("/files")
 def delete_all_files():
     all_ids = collection.get()["ids"]
-    if all_ids:
-        collection.delete(ids=all_ids)
+    batch = 5000
+    for i in range(0, len(all_ids), batch):
+        collection.delete(ids=all_ids[i:i + batch])
     logger.info("Cleared all chunks from vectorstore")
     _save_bg()
     return {"message": "Vectorstore cleared", "total_chunks": 0}
