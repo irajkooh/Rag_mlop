@@ -20,8 +20,9 @@ import uuid
 import os
 import re
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
-IS_HF_SPACE = bool(os.getenv("SPACE_ID", ""))
+BACKEND_URL     = os.getenv("BACKEND_URL",     "http://localhost:8000")
+IS_HF_SPACE     = bool(os.getenv("SPACE_ID",   ""))
+HF_DATASET_REPO = os.getenv("HF_DATASET_REPO", "")
 
 # _chat_busy  — prevents concurrent sends (second click is a no-op)
 # _chat_gen   — incremented by Stop; on_send checks it before yielding the answer
@@ -1043,14 +1044,18 @@ def build_ui() -> gr.Blocks:
                     outputs=[upload_status, file_selector, kb_status_out, confirm_row, delete_sel_btn, delete_all_btn],
                 )
 
-        # Space-only: on every page load wipe ALL docs AND reset the entire UI.
-        # Covers both full restart and sleep/wake reconnect scenarios.
+        # Space-only: on every page load reset the chat UI.
+        # If HF persistence is NOT configured, also wipe ChromaDB docs
+        # (prevents stale data from sleep/wake cycles).
+        # If HF persistence IS configured, keep docs (they were restored from dataset).
         if IS_HF_SPACE:
             def _wipe_on_load():
-                try:
-                    requests.delete(f"{BACKEND_URL}/files", timeout=30)
-                except Exception:
-                    pass
+                if not HF_DATASET_REPO:
+                    # No persistence — wipe docs so every page load starts clean
+                    try:
+                        requests.delete(f"{BACKEND_URL}/files", timeout=30)
+                    except Exception:
+                        pass
                 try:
                     requests.post(f"{BACKEND_URL}/session/clear",
                                   json={"session_id": ""}, timeout=10)

@@ -44,13 +44,16 @@ for _d in [DATA_DIR, LOGS_DIR, CHROMA_DIR]:
     _d.mkdir(exist_ok=True)
 
 # ── Environment ────────────────────────────────────────────────────────────────
-OLLAMA_URL   = os.getenv("OLLAMA_URL",   "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
-GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL    = os.getenv("GROQ_MODEL",   "llama-3.1-8b-instant")
-IS_HF_SPACE  = bool(os.getenv("SPACE_ID", ""))
+OLLAMA_URL       = os.getenv("OLLAMA_URL",       "http://localhost:11434")
+OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL",     "llama3")
+GROQ_API_KEY     = os.getenv("GROQ_API_KEY",     "")
+GROQ_MODEL       = os.getenv("GROQ_MODEL",       "llama-3.1-8b-instant")
+IS_HF_SPACE      = bool(os.getenv("SPACE_ID",    ""))
+HF_DATASET_REPO  = os.getenv("HF_DATASET_REPO",  "")   # e.g. "username/my_private_storage"
+HF_TOKEN         = os.getenv("HF_TOKEN",         "")   # HF write token
+_HF_DATA_FILE    = "chromadb_data.json"
 
-logger.info(f"GROQ_API_KEY set: {bool(GROQ_API_KEY)} | model: {GROQ_MODEL} | HF Space: {IS_HF_SPACE}")
+logger.info(f"GROQ_API_KEY set: {bool(GROQ_API_KEY)} | model: {GROQ_MODEL} | HF Space: {IS_HF_SPACE} | HF persistence: {bool(HF_DATASET_REPO)}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -537,11 +540,78 @@ def log_prediction(session_id, question, answer, chunks, latency_ms):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 11. API routes
+# 11. HF Dataset persistence
+# ══════════════════════════════════════════════════════════════════════════════
+
+def load_from_hf_dataset():
+    """On Space startup: download chromadb_data.json from HF dataset and upsert into ChromaDB."""
+    if not (IS_HF_SPACE and HF_DATASET_REPO and HF_TOKEN):
+        return
+    try:
+        from huggingface_hub import hf_hub_download
+        local = hf_hub_download(
+            repo_id=HF_DATASET_REPO,
+            filename=_HF_DATA_FILE,
+            repo_type="dataset",
+            token=HF_TOKEN,
+            force_download=True,
+        )
+        with open(local) as f:
+            data = json.load(f)
+        if data.get("ids"):
+            collection.upsert(
+                ids=data["ids"],
+                documents=data["documents"],
+                embeddings=data["embeddings"],
+                metadatas=data["metadatas"],
+            )
+            logger.info(f"Restored {len(data['ids'])} chunks from HF dataset ({HF_DATASET_REPO})")
+    except Exception as e:
+        logger.info(f"HF dataset load skipped (first run or error): {e}")
+
+
+def save_to_hf_dataset():
+    """Serialize all ChromaDB chunks to JSON and upload to HF private dataset."""
+    if not (IS_HF_SPACE and HF_DATASET_REPO and HF_TOKEN):
+        return
+    import tempfile
+    from huggingface_hub import HfApi
+    try:
+        data = collection.get(include=["documents", "embeddings", "metadatas"])
+        payload = {
+            "ids":        data["ids"],
+            "documents":  data["documents"],
+            "embeddings": data["embeddings"],
+            "metadatas":  data["metadatas"],
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump(payload, f)
+            tmp = Path(f.name)
+        HfApi(token=HF_TOKEN).upload_file(
+            path_or_fileobj=str(tmp),
+            path_in_repo=_HF_DATA_FILE,
+            repo_id=HF_DATASET_REPO,
+            repo_type="dataset",
+        )
+        tmp.unlink(missing_ok=True)
+        logger.info(f"Persisted {len(data['ids'])} chunks to HF dataset")
+    except Exception as e:
+        logger.error(f"HF dataset save failed: {e}")
+
+
+def _save_bg():
+    """Fire-and-forget background save to HF dataset."""
+    import threading
+    threading.Thread(target=save_to_hf_dataset, daemon=True).start()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 12. API routes
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.on_event("startup")
 def startup():
+    load_from_hf_dataset()   # restore previously indexed data (Space + HF_DATASET_REPO only)
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
@@ -594,6 +664,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     with open(dest, "wb") as fh:
         fh.write(await file.read())
     n = index_pdf(dest)
+    _save_bg()
     return {"message": f"Uploaded and indexed {file.filename}", "chunks_added": n, "total_chunks": collection.count()}
 
 
@@ -608,6 +679,7 @@ def upload_url(req: UrlRequest):
         raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
     try:
         n = index_url(url)
+        _save_bg()
         return {"message": f"Indexed {url}", "chunks_added": n, "total_chunks": collection.count()}
     except (ValueError, Exception) as e:
         logger.error(f"URL indexing error for {url}: {e}")
@@ -632,6 +704,7 @@ def delete_file(identifier: str):
     if ids:
         collection.delete(ids=ids)
     logger.info(f"Removed {identifier} from vectorstore ({len(ids)} chunks)")
+    _save_bg()
     return {"message": f"Removed {identifier} from index", "chunks_removed": len(ids), "total_chunks": collection.count()}
 
 
@@ -641,6 +714,7 @@ def delete_all_files():
     if all_ids:
         collection.delete(ids=all_ids)
     logger.info("Cleared all chunks from vectorstore")
+    _save_bg()
     return {"message": "Vectorstore cleared", "total_chunks": 0}
 
 
