@@ -13,6 +13,19 @@ import subprocess
 import sys
 import time
 import urllib.request
+
+# Fix gradio_client bug: get_type() crashes when schema is bool (additionalProperties: false)
+try:
+    from gradio_client import utils as _gc_utils
+    _orig_get_type = _gc_utils.get_type
+    def _safe_get_type(schema):
+        if not isinstance(schema, dict):
+            return "any"
+        return _orig_get_type(schema)
+    _gc_utils.get_type = _safe_get_type
+except Exception:
+    pass
+
 from frontend import build_ui
 
 BACKEND_PORT  = 8000
