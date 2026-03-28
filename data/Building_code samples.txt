@@ -24,6 +24,7 @@ What is the minimum ceiling height for a habitable room?
 What are the egress window requirements for a bedroom?
 What is the required fire resistance rating for exterior walls?
 What is the minimum width of a corridor in a commercial building?
+what are the steps according to building code to design a ramp?
 
 
 https://codes.iccsafe.org/codes/irc
