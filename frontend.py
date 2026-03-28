@@ -915,7 +915,7 @@ def build_ui() -> gr.Blocks:
                         const last = nodes[nodes.length - 1];
                         const clone = last.cloneNode(true);
                         clone.querySelectorAll('span[onclick], button, .msg-copy-btn').forEach(el => el.remove());
-                        const text = (clone.innerText || '').replace(/⏱️\s*[\d,]+\s*ms/gi,'').replace(/[*_`#>~|]/g,'').replace(/\\n/g,' ').trim();
+                        const text = (clone.innerText || '').replace(/⏱️\s*[\d,]+\s*ms/gi,'').replace(/📎\s*Sources:.*$/gim,'').replace(/[*_`#>~|]/g,'').replace(/\\n/g,' ').trim();
                         if (!text) return;
                         const u = new SpeechSynthesisUtterance(text);
                         u.rate = 0.93; u.pitch = 1.0;

@@ -34,4 +34,5 @@ EXPOSE 7860
 # OLLAMA_MODEL   — model name served by Ollama (default: llama3)
 # BACKEND_URL    — URL frontend uses to reach backend (default: http://localhost:8000)
 
+ENV PYTHONUNBUFFERED=1
 CMD ["python", "app.py"]
