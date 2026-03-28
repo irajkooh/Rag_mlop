@@ -10,16 +10,25 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-# Install CPU-only torch first (~300 MB vs ~2 GB for CUDA build)
+# ── Heavy deps — cached independently of requirements.txt ──────────────────
+# These rarely change; keeping them in their own layer avoids re-downloading
+# torch (~300 MB) on every requirements.txt update.
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-# Install everything else (skip torch line to avoid re-downloading)
-RUN grep -v '^torch==' requirements.txt > /tmp/req_notorch.txt && \
-    pip install --no-cache-dir -r /tmp/req_notorch.txt
+RUN pip install --no-cache-dir \
+    sentence-transformers==3.0.1 \
+    onnxruntime==1.24.4 \
+    pymupdf==1.24.5 \
+    gradio==4.44.1
 
 # Pre-bake the embedding model so cold-start is fast
 RUN python -c "from sentence_transformers import SentenceTransformer; \
                SentenceTransformer('all-MiniLM-L6-v2')"
+
+# ── Light deps — reinstalled when requirements.txt changes ─────────────────
+COPY requirements.txt .
+RUN grep -vE '^(torch|sentence-transformers|onnxruntime|pymupdf|gradio)==' requirements.txt \
+    > /tmp/req_light.txt && \
+    pip install --no-cache-dir -r /tmp/req_light.txt
 
 COPY . .
 
