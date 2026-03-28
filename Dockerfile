@@ -2,17 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for PyMuPDF + ChromaDB native libs
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libmupdf-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
 # ── Heavy deps — cached independently of requirements.txt ──────────────────
-# These rarely change; keeping them in their own layer avoids re-downloading
-# torch (~300 MB) on every requirements.txt update.
+# All packages ship pre-compiled manylinux wheels — no gcc/system libs needed.
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir \
     sentence-transformers==3.0.1 \
@@ -32,16 +23,8 @@ RUN grep -vE '^(torch|sentence-transformers|onnxruntime|pymupdf|gradio)==' requi
 
 COPY . .
 
-# Persistent directories
 RUN mkdir -p data logs chroma_db
 
 EXPOSE 7860
-
-# ── Environment variable reference (set in HF Space Secrets) ──────────────
-# GROQ_API_KEY   — Groq API key (used when Ollama is not available)
-# OLLAMA_URL     — Ollama server URL (default: http://localhost:11434)
-# OLLAMA_MODEL   — model name served by Ollama (default: llama3)
-# BACKEND_URL    — URL frontend uses to reach backend (default: http://localhost:8000)
-
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "app.py"]
