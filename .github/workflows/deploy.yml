@@ -1,0 +1,123 @@
+name: CI/CD → HuggingFace Space
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # MLOps monitoring — daily at midnight UTC
+    - cron: '0 0 * * *'
+
+# ── Job 1: CI/CD ─────────────────────────────────────────────────────────────
+jobs:
+  deploy:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: pip install pytest httpx requests
+
+      - name: Run tests
+        run: |
+          if [ -d "tests" ] && ls tests/*.py &>/dev/null; then
+            pytest tests/ -v --tb=short
+          else
+            echo "No tests found — skipping"
+          fi
+
+      - name: Deploy to HuggingFace Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pip install huggingface_hub --quiet
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          token = os.environ["HF_TOKEN"].strip()
+          api = HfApi()
+          user = api.whoami(token=token)
+          print(f"Authenticated as: {user['name']}")
+
+          api.upload_folder(
+              folder_path=".",
+              repo_id="irajkoohi/Rag_mlop",
+              repo_type="space",
+              token=token,
+              ignore_patterns=[
+                  ".git", ".git/*",
+                  ".venv", ".venv/*",
+                  "__pycache__", "**/__pycache__",
+                  "chroma_db", "chroma_db/*",
+                  "data/*.pdf",
+                  "logs", "logs/*",
+                  "*.pyc",
+              ],
+          )
+          print("Deployed to HuggingFace Space")
+          EOF
+
+      - name: Notify success
+        if: success()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          python - <<'EOF'
+          import os, sys
+          sys.path.insert(0, ".")
+          os.environ.setdefault("SLACK_WEBHOOK_URL", os.getenv("SLACK_WEBHOOK_URL", ""))
+          from monitor.alerts import alert_deploy_success
+          alert_deploy_success(os.getenv("COMMIT_SHA", ""))
+          EOF
+
+      - name: Notify failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python - <<'EOF'
+          import os, sys
+          sys.path.insert(0, ".")
+          os.environ.setdefault("SLACK_WEBHOOK_URL", os.getenv("SLACK_WEBHOOK_URL", ""))
+          from monitor.alerts import send_alert
+          send_alert("Deploy pipeline FAILED. Check GitHub Actions.", level="critical")
+          EOF
+
+# ── Job 2: MLOps Monitoring ───────────────────────────────────────────────────
+  monitor:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install monitoring dependencies
+        run: pip install requests scipy
+
+      - name: Drift detection
+        env:
+          SPACE_URL: https://irajkoohi-rag-mlop.hf.space
+          IDK_THRESHOLD: "0.5"
+          LATENCY_THRESHOLD: "5000"
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m monitor.drift_check
+
+      - name: Accuracy / canary check
+        env:
+          SPACE_URL: https://irajkoohi-rag-mlop.hf.space
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m monitor.accuracy_check
