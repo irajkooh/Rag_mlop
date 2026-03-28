@@ -14,15 +14,15 @@ import sys
 import time
 import urllib.request
 
-# Fix gradio_client bug: get_type() crashes when schema is bool (additionalProperties: false)
+# Fix gradio_client bug: crashes when JSON schema contains bool values (additionalProperties: true/false)
 try:
     from gradio_client import utils as _gc_utils
-    _orig_get_type = _gc_utils.get_type
-    def _safe_get_type(schema):
+    _orig = _gc_utils._json_schema_to_python_type
+    def _safe_json_schema_to_python_type(schema, defs=None):
         if not isinstance(schema, dict):
             return "any"
-        return _orig_get_type(schema)
-    _gc_utils.get_type = _safe_get_type
+        return _orig(schema, defs)
+    _gc_utils._json_schema_to_python_type = _safe_json_schema_to_python_type
 except Exception:
     pass
 
