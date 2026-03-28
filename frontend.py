@@ -510,15 +510,26 @@ button.btn-clear:hover {
     border-color: var(--red) !important;
 }
 
-/* Action row — 4 buttons, no wrap, fixed width, tight gap */
+/* Action row — 4 buttons, compact */
 #action-row,
 #action-row > div,
 #action-row > div > div {
     flex-wrap: nowrap !important;
     gap: 4px !important;
 }
-#action-row button { width: 140px !important; }
-button.btn-read { min-width: 140px !important; }
+#action-row > div { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; }
+#action-row button,
+button.btn-stop,
+button.btn-read,
+button.btn-copy-all,
+button.btn-clear {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 4px 54px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+}
 
 /* Danger (upload tab delete buttons) */
 button.btn-danger {
@@ -751,10 +762,10 @@ def build_ui() -> gr.Blocks:
                             send_btn = gr.Button("Send ➤", variant="primary")
 
                 with gr.Row(elem_id="action-row"):
-                    stop_btn     = gr.Button("⏹ Stop",         elem_classes="btn-stop")
-                    read_btn     = gr.Button("🔊 Read Last",    elem_classes="btn-read")
-                    copy_all_btn = gr.Button("📋 Copy All",     elem_classes="btn-copy-all")
-                    clear_btn    = gr.Button("🗑️ Clear Chat",  elem_classes="btn-clear")
+                    stop_btn     = gr.Button("⏹ Stop",         elem_classes="btn-stop",     scale=0)
+                    read_btn     = gr.Button("🔊 Read Last",    elem_classes="btn-read",     scale=0)
+                    copy_all_btn = gr.Button("📋 Copy All",     elem_classes="btn-copy-all", scale=0)
+                    clear_btn    = gr.Button("🗑️ Clear Chat",  elem_classes="btn-clear",    scale=0)
 
                 gr.HTML("<hr class='divider'>")
 
