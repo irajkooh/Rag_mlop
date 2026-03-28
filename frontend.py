@@ -812,11 +812,14 @@ def build_ui() -> gr.Blocks:
                     my_gen = _chat_gen          # snapshot generation at call time
                     try:
                         yield hist, sid, gr.update(value="Thinking…", interactive=False), "", hist
-                        await asyncio.sleep(0)  # flush "Thinking…" before blocking
                         loop = asyncio.get_event_loop()
-                        new_hist, new_sid, _, plain = await loop.run_in_executor(
-                            None, lambda: chat(msg, hist, sid)
-                        )
+                        task = loop.run_in_executor(None, lambda: chat(msg, hist, sid))
+                        # Heartbeat: re-yield every 3 s to keep SSE stream alive
+                        while not task.done():
+                            await asyncio.sleep(3)
+                            if not task.done():
+                                yield gr.update(), gr.update(), gr.update(value="Thinking…", interactive=False), gr.update(), gr.update()
+                        new_hist, new_sid, _, plain = await task
                         # Only show result if Stop wasn't clicked while we were waiting
                         if my_gen == _chat_gen:
                             yield new_hist, new_sid, gr.update(value="", interactive=True), plain, new_hist
