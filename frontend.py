@@ -510,7 +510,7 @@ button.btn-clear:hover {
     border-color: var(--red) !important;
 }
 
-/* Action row — 4 buttons, compact */
+/* Action row — 2 buttons (Stop, Read Last) */
 #action-row,
 #action-row > div,
 #action-row > div > div {
@@ -520,15 +520,31 @@ button.btn-clear:hover {
 #action-row > div { flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; }
 #action-row button,
 button.btn-stop,
-button.btn-read,
-button.btn-copy-all,
-button.btn-clear {
+button.btn-read {
     width: auto !important;
     min-width: 0 !important;
     max-width: none !important;
     padding: 4px 54px !important;
     font-size: 11px !important;
     white-space: nowrap !important;
+}
+
+/* Copy All / Clear Chat — under Send button */
+#send-col-btns,
+#send-col-btns > div,
+#send-col-btns > div > div {
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+}
+button.btn-copy-all,
+button.btn-clear {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
+    height: 32px !important;
+    min-height: 32px !important;
 }
 
 /* Danger (upload tab delete buttons) */
@@ -757,15 +773,16 @@ def build_ui() -> gr.Blocks:
                             max_lines=5,
                             elem_id="question-input",
                         )
-                    with gr.Column(scale=2, min_width=120):
+                    with gr.Column(scale=2, min_width=120, elem_id="send-col"):
                         with gr.Column(elem_classes="btn-send"):
                             send_btn = gr.Button("Send ➤", variant="primary")
+                        with gr.Row(elem_id="send-col-btns"):
+                            copy_all_btn = gr.Button("📋 Copy All",    elem_classes="btn-copy-all", scale=1)
+                            clear_btn    = gr.Button("🗑️ Clear Chat", elem_classes="btn-clear",    scale=1)
 
                 with gr.Row(elem_id="action-row"):
                     stop_btn     = gr.Button("⏹ Stop",         elem_classes="btn-stop",     scale=0)
                     read_btn     = gr.Button("🔊 Read Last",    elem_classes="btn-read",     scale=0)
-                    copy_all_btn = gr.Button("📋 Copy All",     elem_classes="btn-copy-all", scale=0)
-                    clear_btn    = gr.Button("🗑️ Clear Chat",  elem_classes="btn-clear",    scale=0)
 
                 gr.HTML("<hr class='divider'>")
 
