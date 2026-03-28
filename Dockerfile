@@ -1,5 +1,6 @@
 FROM python:3.11-slim
 
+# cache bust: 2026-03-28
 WORKDIR /app
 
 # ── Heavy deps — cached independently of requirements.txt ──────────────────
