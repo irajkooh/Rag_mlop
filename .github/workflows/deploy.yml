@@ -102,7 +102,38 @@ jobs:
           send_alert("Deploy pipeline FAILED. Check GitHub Actions.", level="critical")
           EOF
 
-# ── Job 2: MLOps Monitoring ───────────────────────────────────────────────────
+# ── Job 2: Wake HF Spaces ─────────────────────────────────────────────────────
+  wake-spaces:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake / restart sleeping spaces
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          pip install huggingface_hub --quiet
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+          token = os.environ["HF_TOKEN"].strip()
+          api = HfApi()
+          spaces = [
+              "irajkoohi/Rag_mlop",
+              "irajkoohi/Agentic_Rag1_dep_space",
+          ]
+          for space in spaces:
+              try:
+                  info = api.get_space_runtime(space, token=token)
+                  stage = info.stage
+                  print(f"{space}: {stage}")
+                  if stage in ("SLEEPING", "PAUSED", "STOPPED", "ERROR", "RUNTIME_ERROR"):
+                      api.restart_space(space, token=token)
+                      print(f"  → restarted")
+              except Exception as e:
+                  print(f"  → failed: {e}")
+          EOF
+
+# ── Job 3: MLOps Monitoring ───────────────────────────────────────────────────
   monitor:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
