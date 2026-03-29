@@ -566,13 +566,16 @@ def load_from_hf_dataset():
         with open(local) as f:
             data = json.load(f)
         if data.get("ids"):
-            collection.upsert(
-                ids=data["ids"],
-                documents=data["documents"],
-                embeddings=data["embeddings"],
-                metadatas=data["metadatas"],
-            )
-            logger.info(f"Restored {len(data['ids'])} chunks from HF dataset ({HF_DATASET_REPO})")
+            ids, docs, embs, metas = data["ids"], data["documents"], data["embeddings"], data["metadatas"]
+            batch_size = 5000
+            for i in range(0, len(ids), batch_size):
+                collection.upsert(
+                    ids=ids[i:i+batch_size],
+                    documents=docs[i:i+batch_size],
+                    embeddings=embs[i:i+batch_size],
+                    metadatas=metas[i:i+batch_size],
+                )
+            logger.info(f"Restored {len(ids)} chunks from HF dataset ({HF_DATASET_REPO})")
     except Exception as e:
         logger.info(f"HF dataset load skipped (first run or error): {e}")
 
