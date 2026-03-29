@@ -24,6 +24,7 @@ RUN grep -vE '^(torch|sentence-transformers|onnxruntime|pymupdf|gradio)==' requi
 
 COPY . .
 
+RUN find /app -name "*.pyc" -delete && find /app -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 RUN mkdir -p data logs chroma_db
 
 EXPOSE 7860

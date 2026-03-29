@@ -71,6 +71,7 @@ jobs:
                   "logs", "logs/*",
                   "*.pyc",
               ],
+              delete_patterns=["*.pyc", "__pycache__/*", "**/__pycache__/*"],
           )
           print("Deployed to HuggingFace Space")
           EOF
