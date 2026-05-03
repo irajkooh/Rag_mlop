@@ -22,6 +22,9 @@ env/
 .GROQ_API_KEY.txt
 .HF_TOKEN.txt
 
+# Secrets folder — contains real API keys, never commit
+_secrets/
+
 # ChromaDB vector store (rebuilt at runtime from uploaded PDFs)
 chroma_db/
 

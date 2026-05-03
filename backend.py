@@ -609,6 +609,105 @@ def save_to_hf_dataset():
         logger.error(f"HF dataset save failed: {e}")
 
 
+def load_pdfs_from_hf_dataset():
+    """
+    On Space startup: download all PDFs stored under pdfs/ in the HF dataset,
+    save them to DATA_DIR, and index any that are not yet in ChromaDB.
+    This is the fallback when chromadb_data.json restore fails or is absent.
+    """
+    if not (IS_HF_SPACE and HF_DATASET_REPO and HF_TOKEN):
+        return
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi(token=HF_TOKEN)
+        files = api.list_repo_files(repo_id=HF_DATASET_REPO, repo_type="dataset")
+        pdf_files = [f for f in files if f.startswith("pdfs/") and f.lower().endswith(".pdf")]
+        if not pdf_files:
+            logger.info("No PDFs found in HF dataset pdfs/ folder")
+            return
+        from huggingface_hub import hf_hub_download
+        newly_indexed = 0
+        for repo_path in pdf_files:
+            pdf_name = Path(repo_path).name
+            local_path = DATA_DIR / pdf_name
+            # Download to data/ if not already there
+            if not local_path.exists():
+                downloaded = hf_hub_download(
+                    repo_id=HF_DATASET_REPO,
+                    filename=repo_path,
+                    repo_type="dataset",
+                    token=HF_TOKEN,
+                    force_download=False,
+                )
+                import shutil
+                shutil.copy2(downloaded, local_path)
+                logger.info(f"Downloaded {pdf_name} from HF dataset")
+            # Index only if chunks not already present
+            existing = collection.get(where={"source": pdf_name})["ids"]
+            if not existing:
+                n = index_pdf(local_path)
+                newly_indexed += n
+                logger.info(f"Auto-indexed {pdf_name}: {n} chunks")
+        if newly_indexed:
+            logger.info(f"PDF fallback indexing complete: {newly_indexed} new chunks")
+            save_to_hf_dataset()   # persist the freshly built index
+    except Exception as e:
+        logger.error(f"load_pdfs_from_hf_dataset failed: {e}")
+
+
+def save_pdf_to_hf_dataset(pdf_path: Path):
+    """Upload a single PDF file to the pdfs/ folder in the HF dataset."""
+    if not (IS_HF_SPACE and HF_DATASET_REPO and HF_TOKEN):
+        return
+    try:
+        from huggingface_hub import HfApi
+        HfApi(token=HF_TOKEN).upload_file(
+            path_or_fileobj=str(pdf_path),
+            path_in_repo=f"pdfs/{pdf_path.name}",
+            repo_id=HF_DATASET_REPO,
+            repo_type="dataset",
+        )
+        logger.info(f"Saved {pdf_path.name} to HF dataset pdfs/")
+    except Exception as e:
+        logger.error(f"save_pdf_to_hf_dataset failed for {pdf_path.name}: {e}")
+
+
+def delete_pdf_from_hf_dataset(filename: str):
+    """Remove a single PDF from the pdfs/ folder in the HF dataset."""
+    if not (IS_HF_SPACE and HF_DATASET_REPO and HF_TOKEN):
+        return
+    try:
+        from huggingface_hub import HfApi
+        HfApi(token=HF_TOKEN).delete_file(
+            path_in_repo=f"pdfs/{filename}",
+            repo_id=HF_DATASET_REPO,
+            repo_type="dataset",
+        )
+        logger.info(f"Deleted {filename} from HF dataset pdfs/")
+    except Exception as e:
+        # File may not exist in dataset (e.g. URL-only doc) — not an error
+        logger.info(f"delete_pdf_from_hf_dataset skipped for {filename}: {e}")
+
+
+def delete_all_pdfs_from_hf_dataset():
+    """Remove every PDF under pdfs/ in the HF dataset."""
+    if not (IS_HF_SPACE and HF_DATASET_REPO and HF_TOKEN):
+        return
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi(token=HF_TOKEN)
+        files = api.list_repo_files(repo_id=HF_DATASET_REPO, repo_type="dataset")
+        pdf_files = [f for f in files if f.startswith("pdfs/") and f.lower().endswith(".pdf")]
+        for repo_path in pdf_files:
+            try:
+                api.delete_file(path_in_repo=repo_path, repo_id=HF_DATASET_REPO, repo_type="dataset")
+                logger.info(f"Deleted {repo_path} from HF dataset")
+            except Exception as e:
+                logger.warning(f"Could not delete {repo_path}: {e}")
+    except Exception as e:
+        logger.error(f"delete_all_pdfs_from_hf_dataset failed: {e}")
+
+
 def _save_bg():
     """Fire-and-forget background save to HF dataset."""
     import threading
@@ -622,6 +721,9 @@ def _save_bg():
 @app.on_event("startup")
 def startup():
     load_from_hf_dataset()   # restore previously indexed data (Space + HF_DATASET_REPO only)
+    # If the vector snapshot was missing or empty, fall back to re-indexing PDFs from HF Dataset
+    if IS_HF_SPACE and collection.count() == 0:
+        load_pdfs_from_hf_dataset()
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
@@ -671,9 +773,13 @@ async def upload_pdf(file: UploadFile = File(...)):
     if not file.filename.endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
     dest = DATA_DIR / file.filename
+    content = await file.read()
     with open(dest, "wb") as fh:
-        fh.write(await file.read())
+        fh.write(content)
     n = index_pdf(dest)
+    # Persist both the raw PDF and the updated vector snapshot to HF Dataset
+    import threading
+    threading.Thread(target=save_pdf_to_hf_dataset, args=(dest,), daemon=True).start()
     _save_bg()
     return {"message": f"Uploaded and indexed {file.filename}", "chunks_added": n, "total_chunks": collection.count()}
 
@@ -706,25 +812,39 @@ def reload_kb():
 # Delete by filename (PDF) or by full URL (web doc)
 @app.delete("/files/{identifier:path}")
 def delete_file(identifier: str):
-    # Try as PDF filename first
+    import threading
+    # Determine whether this is a PDF (no URL metadata) or a URL-indexed doc
     ids = collection.get(where={"source": identifier})["ids"]
+    is_pdf = bool(ids)  # source-match means it was a PDF
     if not ids:
         # Try as full URL (for web docs)
         ids = collection.get(where={"url": identifier})["ids"]
     if ids:
         collection.delete(ids=ids)
     logger.info(f"Removed {identifier} from vectorstore ({len(ids)} chunks)")
+    # Remove the raw PDF from HF Dataset so it won't be re-indexed on next restart
+    if is_pdf:
+        threading.Thread(target=delete_pdf_from_hf_dataset, args=(identifier,), daemon=True).start()
+        # Also remove local copy so it isn't re-indexed from data/ on local restarts
+        local_path = DATA_DIR / identifier
+        if local_path.exists():
+            local_path.unlink(missing_ok=True)
     _save_bg()
     return {"message": f"Removed {identifier} from index", "chunks_removed": len(ids), "total_chunks": collection.count()}
 
 
 @app.delete("/files")
 def delete_all_files():
+    import threading
     all_ids = collection.get()["ids"]
     batch = 5000
     for i in range(0, len(all_ids), batch):
         collection.delete(ids=all_ids[i:i + batch])
     logger.info("Cleared all chunks from vectorstore")
+    # Remove all raw PDFs from HF Dataset and local data/
+    threading.Thread(target=delete_all_pdfs_from_hf_dataset, daemon=True).start()
+    for pdf in list(DATA_DIR.glob("*.pdf")):
+        pdf.unlink(missing_ok=True)
     _save_bg()
     return {"message": "Vectorstore cleared", "total_chunks": 0}
 
