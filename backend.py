@@ -49,7 +49,7 @@ OLLAMA_MODEL     = os.getenv("OLLAMA_MODEL",     "llama3")
 GROQ_API_KEY     = os.getenv("GROQ_API_KEY",     "")
 GROQ_MODEL       = os.getenv("GROQ_MODEL",       "llama-3.1-8b-instant")
 IS_HF_SPACE      = bool(os.getenv("SPACE_ID",    ""))
-HF_DATASET_REPO  = os.getenv("HF_DATASET_REPO",  "")   # e.g. "username/my_private_storage"
+HF_DATASET_REPO  = os.getenv("HF_DATASET_REPO",  "")   # e.g. "username/Rag_mlop_dataset"
 HF_TOKEN         = os.getenv("HF_TOKEN",         "")   # HF write token
 _HF_DATA_FILE    = "chromadb_data.json"
 
