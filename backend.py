@@ -812,39 +812,25 @@ def reload_kb():
 # Delete by filename (PDF) or by full URL (web doc)
 @app.delete("/files/{identifier:path}")
 def delete_file(identifier: str):
-    import threading
     # Determine whether this is a PDF (no URL metadata) or a URL-indexed doc
     ids = collection.get(where={"source": identifier})["ids"]
-    is_pdf = bool(ids)  # source-match means it was a PDF
     if not ids:
         # Try as full URL (for web docs)
         ids = collection.get(where={"url": identifier})["ids"]
     if ids:
         collection.delete(ids=ids)
     logger.info(f"Removed {identifier} from vectorstore ({len(ids)} chunks)")
-    # Remove the raw PDF from HF Dataset so it won't be re-indexed on next restart
-    if is_pdf:
-        threading.Thread(target=delete_pdf_from_hf_dataset, args=(identifier,), daemon=True).start()
-        # Also remove local copy so it isn't re-indexed from data/ on local restarts
-        local_path = DATA_DIR / identifier
-        if local_path.exists():
-            local_path.unlink(missing_ok=True)
     _save_bg()
     return {"message": f"Removed {identifier} from index", "chunks_removed": len(ids), "total_chunks": collection.count()}
 
 
 @app.delete("/files")
 def delete_all_files():
-    import threading
     all_ids = collection.get()["ids"]
     batch = 5000
     for i in range(0, len(all_ids), batch):
         collection.delete(ids=all_ids[i:i + batch])
     logger.info("Cleared all chunks from vectorstore")
-    # Remove all raw PDFs from HF Dataset and local data/
-    threading.Thread(target=delete_all_pdfs_from_hf_dataset, daemon=True).start()
-    for pdf in list(DATA_DIR.glob("*.pdf")):
-        pdf.unlink(missing_ok=True)
     _save_bg()
     return {"message": "Vectorstore cleared", "total_chunks": 0}
 
