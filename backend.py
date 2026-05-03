@@ -724,6 +724,19 @@ def startup():
     # If the vector snapshot was missing or empty, fall back to re-indexing PDFs from HF Dataset
     if IS_HF_SPACE and collection.count() == 0:
         load_pdfs_from_hf_dataset()
+    # Final fallback: index any PDFs sitting in data/ that aren't yet in ChromaDB
+    if collection.count() == 0:
+        n = build_knowledge_base()
+        if n:
+            logger.info(f"Indexed {n} chunks from data/ folder")
+            _save_bg()
+    else:
+        # Also index any new PDFs in data/ not yet represented in ChromaDB
+        for pdf in DATA_DIR.glob("*.pdf"):
+            if not collection.get(where={"source": pdf.name})["ids"]:
+                n = index_pdf(pdf)
+                logger.info(f"Auto-indexed new PDF {pdf.name}: {n} chunks")
+                _save_bg()
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
 
@@ -812,25 +825,35 @@ def reload_kb():
 # Delete by filename (PDF) or by full URL (web doc)
 @app.delete("/files/{identifier:path}")
 def delete_file(identifier: str):
+    import threading
     # Determine whether this is a PDF (no URL metadata) or a URL-indexed doc
     ids = collection.get(where={"source": identifier})["ids"]
+    is_pdf = bool(ids)
     if not ids:
         # Try as full URL (for web docs)
         ids = collection.get(where={"url": identifier})["ids"]
     if ids:
         collection.delete(ids=ids)
     logger.info(f"Removed {identifier} from vectorstore ({len(ids)} chunks)")
+    # Remove from HF Dataset so it won't be re-indexed on Space restart
+    # (does NOT touch the local data/ folder)
+    if is_pdf:
+        threading.Thread(target=delete_pdf_from_hf_dataset, args=(identifier,), daemon=True).start()
     _save_bg()
     return {"message": f"Removed {identifier} from index", "chunks_removed": len(ids), "total_chunks": collection.count()}
 
 
 @app.delete("/files")
 def delete_all_files():
+    import threading
     all_ids = collection.get()["ids"]
     batch = 5000
     for i in range(0, len(all_ids), batch):
         collection.delete(ids=all_ids[i:i + batch])
     logger.info("Cleared all chunks from vectorstore")
+    # Remove all PDFs from HF Dataset so they don't return on Space restart
+    # (does NOT touch the local data/ folder)
+    threading.Thread(target=delete_all_pdfs_from_hf_dataset, daemon=True).start()
     _save_bg()
     return {"message": "Vectorstore cleared", "total_chunks": 0}
 
