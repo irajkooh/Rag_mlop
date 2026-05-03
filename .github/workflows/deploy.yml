@@ -67,7 +67,6 @@ jobs:
                   ".venv", ".venv/*",
                   "__pycache__", "**/__pycache__",
                   "chroma_db", "chroma_db/*",
-                  "data/*.pdf",
                   "logs", "logs/*",
                   "*.pyc",
               ],
