@@ -42,7 +42,7 @@ def free_port(port: int):
         pass
 
 
-def wait_for_backend(port: int, timeout: int = 30):
+def wait_for_backend(port: int, timeout: int = 120):
     """Poll until the backend is accepting connections."""
     url = f"http://localhost:{port}/system/info"
     deadline = time.time() + timeout

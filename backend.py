@@ -718,8 +718,10 @@ def _save_bg():
 # 12. API routes
 # ══════════════════════════════════════════════════════════════════════════════
 
-@app.on_event("startup")
-def startup():
+def _do_startup():
+    """Heavy startup work — runs in a background thread so FastAPI accepts
+    connections immediately (fixes 'Connection refused' on HF Space where
+    downloading chromadb_data.json can take several minutes)."""
     load_from_hf_dataset()   # restore previously indexed data (Space + HF_DATASET_REPO only)
     # If the vector snapshot was missing or empty, fall back to re-indexing PDFs from HF Dataset
     if IS_HF_SPACE and collection.count() == 0:
@@ -739,6 +741,12 @@ def startup():
                 _save_bg()
     logger.info(f"Startup complete — ChromaDB: {collection.count()} chunks indexed")
     logger.info(f"LLM: {active_llm_label()} | Device: {DEVICE}")
+
+
+@app.on_event("startup")
+def startup():
+    import threading
+    threading.Thread(target=_do_startup, daemon=True).start()
 
 
 @app.get("/health")
