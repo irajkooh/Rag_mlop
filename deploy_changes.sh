@@ -1,3 +1,22 @@
+"""
+<<<<<<< HEAD
+# Run:
+# chmod +x /Users/ik/UVcodes/Rag_mlop/deploy_changes.sh
+
+
+#!/usr/bin/env bash
+# Usage: ./deploy_changes.sh "your commit message"
+set -e
+
+MSG="${1:-update}"
+
+git add -A
+git commit -m "$MSG"
+git push origin main
+
+echo "✅ Pushed — GitHub Actions will deploy to HF Space automatically."
+=======
+"""
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # deploy_changes.sh  —  Push local changes to GitHub + HuggingFace Space
@@ -237,3 +256,4 @@ echo "✅ Deployed successfully!"
 echo "   GitHub : https://github.com/irajkooh/AgenticMultimodalRag"
 echo "   Space  : https://huggingface.co/spaces/irajkoohi/AgenticMultimodalRag"
 echo "   Dataset: https://huggingface.co/datasets/irajkoohi/AgenticMultiModalRag_dataset"
+>>>>>>> 635d7d0 (fix: update rag_engine.py implementation)
