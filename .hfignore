@@ -1,0 +1,14 @@
+_secrets/
+data/*.pdf
+data/*.docx
+data/*.png
+data/*.jpg
+data/*.jpeg
+data/*.xlsx
+data/images/
+data/tables/
+vectorstore/
+vectorstore_corrupted_backup/
+.venv/
+__pycache__/
+*.pyc

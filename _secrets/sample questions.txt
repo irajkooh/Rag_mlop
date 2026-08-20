@@ -1,0 +1,249 @@
+
+
+#### 2010-design-standards.pdf
+https://www.ada.gov/law-and-regs/design-standards/2010-stds/
+
+#### 2024 IBC.pdf
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://www.pinetoplakesideaz.gov/DocumentCenter/View/3717/2024-IBC
+
+#### Significant Changes to the International Codes (PDF).pdf
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://content.civicplus.com/api/assets/95754205-2fa5-47dc-b23e-d8d00be75d71?cache=1800
+
+#### ASCE 7-05.pdf
+chrome-extension://efaidnbmnnnibpcajpcglclefindmkaj/https://fluxus.cca.edu/~bbeazley/extreme-structures/links/ASCE%207-05.pdf
+
+https://codes.iccsafe.org/codes/irc
+https://codes.iccsafe.org/content/CHIBC2019P1
+https://codes.iccsafe.org/codes/chicago
+https://codes.iccsafe.org/codes/iecc
+https://codes.iccsafe.org/codes/chicago
+https://codes.iccsafe.org/content/IBC2024P1
+
+What is the maximum rise and minimum run for stair treads?
+How many exits are required for a building with an occupant load over 500?
+What are the smoke detector placement requirements in a residential unit?
+How far apart must handrails be on a stairway?
+What is the maximum slope for a accessible ramp?
+What are the requirements for fire sprinkler systems in high-rise buildings?
+
+What is the minimum ceiling height for a habitable room?
+What are the egress window requirements for a bedroom?
+What is the required fire resistance rating for exterior walls?
+What is the minimum width of a corridor in a commercial building?
+what are the steps according to building code to design a ramp?
+
+
+how to install postgresql?
+create a cover letter for tella for lead architect position
+who is the sales rep of texas?
+what is the total price of sold apples by william?
+what is the total sales of all items for william?
+what is the total sales of all sellers in 1/2/2022?
+what is the max, min, and avg values in column credit?
+what is the max, min, and avg values in columns credit, and balance?
+what are spendings in march 2026?
+how much i paid for grocery in march?
+how much i paid for grocery in april?
+
+who is iraj?
+tell me about his education and experience
+write a cover letter for iraj for position of lead ai engineer
+write a cover letter for tella for position of lead architect
+####################################################
+What is the maximum rise and minimum run for stair treads?
+
+Assistant: The maximum riser height is **7 inches (178 mm)** and the minimum tread depth is **11 inches (280 mm)**.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf*
+#####
+How many exits are required for a building with an occupant load over 500?
+
+Assistant: According to **Doc 7 — 2024 IBC.pdf, Page 316**, for an occupant load over 1,000, **4** exits are required, but for an occupant load between **501-1,000**, **3** exits are required.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf*
+#####
+What are the smoke detector placement requirements in a residential unit?
+
+Assistant: According to **Doc 7 — 2024 IBC.pdf, Page 287**, smoke alarms shall be installed not less than **3 feet (914 mm)** horizontally from the door or opening of a bathroom that contains a bathtub or shower.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf, Significant Changes to the International Codes.pdf*
+#####
+How far apart must handrails be on a stairway?
+
+Assistant: **30 inches (762 mm)** or less, so all portions of the stairway minimum width or required capacity are within **30 inches (762 mm)** of a handrail.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf*
+#####
+What is the maximum slope for a accessible ramp?
+
+Assistant: The maximum slope for an accessible ramp is **1 unit vertical in 12 units horizontal (8.3-percent slope)** for ramps used as part of a means of egress, and **1 unit vertical in 8 units horizontal (12.5-percent slope)** for other pedestrian ramps. [Source: Doc 5 — 2024 IBC.pdf, Page 334]
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf*
+#####
+What are the requirements for fire sprinkler systems in high-rise buildings?
+
+Assistant: In buildings more than **420 feet** in height, not fewer than **two** standpipes or sprinkler express risers shall supply automatic sprinkler systems within each vertical water supply zone. [Source: Doc 7 — 2024 IBC.pdf, Page 90]
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf, Significant Changes to the International Codes.pdf*
+#####
+What is the minimum ceiling height for a habitable room?
+
+Assistant: **7 feet 6 inches (2286 mm)** above the finished floor for occupiable spaces, habitable spaces and corridors, and **7 feet (2134 mm)** above the finished floor for bathrooms, toilet rooms, kitchens, storage rooms and laundry rooms.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf*
+#####
+What are the egress window requirements for a bedroom?
+
+Assistant: According to **Doc 5 — 2024 IBC.pdf, Page 340**, for Group R-2 and R-3 buildings, including dwelling units, where the bottom of the clear opening of an operable window is located less than **36 inches (914 mm)** above the finished floor and more than **72 inches (1829 mm)** above the finished grade or other surface below on the exterior of the building, the window shall comply with certain requirements.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf, word.docx, Significant Changes to the International Codes.pdf*
+#####
+What is the required fire resistance rating for exterior walls?
+
+Assistant: According to **Doc 5 — 2024 IBC.pdf, Page 163**, the fire-resistance rating of an exterior wall is determined based upon the fire separation distance of the exterior wall and the story in which the wall is located. 
+
+The required fire-resistance rating for exterior walls can be found in **TABLE 705.5**. However, the exact table values are not provided in the given context. 
+
+Therefore, I DON'T KNOW the exact required fire resistance rating for exterior walls.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, Significant Changes to the International Codes.pdf*
+#####
+what are the steps according to building code to design a ramp?
+
+Assistant: According to **Doc 3 — 2010-design-standards.pdf, Page 132**, the steps to design a ramp are:
+
+1. **Rise**: The rise for any ramp run shall be **30 inches (760 mm)** maximum.
+2. **Landings**: Ramps shall have landings at the top and the bottom of each ramp run. Landings shall comply with **405.7**.
+3. **Cross slope**: The slope measured perpendicular to the direction of travel of a ramp shall not be steeper than **one unit vertical in 48 units horizontal (2-percent slope)**.
+
+Additionally, according to **Doc 7 — 2024 IBC.pdf, Page 334**, the maximum slope for an accessible ramp is **1 unit vertical in 12 units horizontal (8.3-percent slope)** for ramps used as part of a means of egress.
+
+Also, according to **Doc 5 — 2024 IBC.pdf, Page 335**, ramps shall be built of materials consistent with the types permitted for the type of construction of the building, and the surface of ramps shall be of slip-resistant materials that are securely attached.
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2024 IBC.pdf, 2010-design-standards.pdf, word.docx, Significant Changes to the International Codes.pdf*
+#####
+who is the sales rep of texas?
+
+Assistant: The sales rep of Texas is William.
+
+Underlying rows:
+| Sales_Rep   | Region   |
+|:------------|:---------|
+| William     | Texas    |
+
+
+
+🗃️ *Answer generated from structured table query (SQL)*
+📄 *Sources: 2010-design-standards.pdf, 2024 IBC.pdf, Significant Changes to the International Codes.pdf, img_1.png, img_2.png, img_3.png, txt_1.txt, word.docx*
+#####
+what is the total price of sold apples by william?
+
+Assistant: The total price of sold apples by William is 63.
+
+Underlying rows:
+| Date     | Item   | Sales_Rep   |   Unit_Price |   Quantity |   Sales |
+|:---------|:-------|:------------|-------------:|-----------:|--------:|
+| 1/2/2022 | Apple  | William     |          2.1 |         30 |      63 |
+
+
+
+🗃️ *Answer generated from structured table query (SQL)*
+📄 *Sources: 2010-design-standards.pdf, 2024 IBC.pdf, Significant Changes to the International Codes.pdf, img_1.png, img_2.png, img_3.png, txt_1.txt, word.docx*
+#####
+what is the total sales of all items for william?
+
+Assistant: You had total sales of 447.4 for all items.
+
+Underlying rows:
+| Date      | Item   | Sales_Rep   |   Unit_Price |   Quantity |   Sales |
+|:----------|:-------|:------------|-------------:|-----------:|--------:|
+| 1/2/2022  | Apple  | William     |          2.1 |         30 |    63   |
+| 3/9/2022  | Pears  | William     |          3.3 |         32 |   105.6 |
+| 4/29/2022 | Peach  | William     |          3.4 |         82 |   278.8 |
+
+
+
+🗃️ *Answer generated from structured table query (SQL)*
+📄 *Sources: 2010-design-standards.pdf, 2024 IBC.pdf, Significant Changes to the International Codes.pdf, img_1.png, img_2.png, img_3.png, txt_1.txt, word.docx*
+#####
+what is the total sales of all sellers in 1/2/2022?
+
+Assistant: The total sales of all sellers on 1/2/2022 was 63.
+
+Underlying rows:
+| Date     | Item   | Sales_Rep   |   Unit_Price |   Quantity |   Sales |
+|:---------|:-------|:------------|-------------:|-----------:|--------:|
+| 1/2/2022 | Apple  | William     |          2.1 |         30 |      63 |
+
+
+
+🗃️ *Answer generated from structured table query (SQL)*
+📄 *Sources: 2010-design-standards.pdf, 2024 IBC.pdf, Significant Changes to the International Codes.pdf, img_1.png, img_2.png, img_3.png, txt_1.txt, word.docx*
+#####
+what is the max, min, and avg values in column credit?
+
+Assistant: The max, min, and avg values in column credit are:
+
+Max: **-12.06**
+Min: **-214.45**
+Avg: **-143.41**
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2010-design-standards.pdf, Significant Changes to the International Codes.pdf, 2024 IBC.pdf, img_1.png, img_2.png, img_3.png*
+#####
+what is the max, min, and avg values in columns credit, and balance?
+
+Assistant: The max, min, and avg values in columns credit and balance are:
+
+Credit:
+Max: **-214.45**
+Min: **-12.06**
+Avg: **-143.41**
+
+Balance:
+Max: **-342.61**
+Min: **1136**
+Avg: **-623.26**
+
+🔍 *Answer retrieved from document chunks (26 chunks)*
+📄 *Sources: 2010-design-standards.pdf, Significant Changes to the International Codes.pdf, 2024 IBC.pdf, img_1.png, img_2.png, img_3.png*
+#####
+how much i paid for grocery in march?
+
+Assistant: You spent $254.23 on groceries in March.
+
+Underlying rows:
+| Date       |   Credit | Description   |   Balance |
+|:-----------|---------:|:--------------|----------:|
+| 2026-03-30 |  -254.23 | Grocery       |    -693.9 |
+
+
+
+🗃️ *Answer generated from structured table query (SQL)*
+📄 *Sources: 2010-design-standards.pdf, 2024 IBC.pdf, Significant Changes to the International Codes.pdf, img_1.png, img_2.png, img_3.png, txt_1.txt, word.docx*
+#####
+how much i paid for grocery in april?
+
+Assistant: You spent $493.53 on groceries in April.
+
+Underlying rows:
+| Date       |   Credit | Description   |   Balance |
+|:-----------|---------:|:--------------|----------:|
+| 2026-04-09 |  -291.79 | Grocery       |  -1336.23 |
+| 2026-04-28 |  -201.74 | Grocery       |    nan    |
+
+
+
+🗃️ *Answer generated from structured table query (SQL)*
+📄 *Sources: 2010-design-standards.pdf, 2024 IBC.pdf, Significant Changes to the International Codes.pdf, img_1.png, img_2.png, img_3.png, txt_1.txt, word.docx*
+#####
